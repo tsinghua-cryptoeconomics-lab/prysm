@@ -461,10 +461,6 @@ func (s *PremineGenesisConfig) setLatestBlockHeader(g state.BeaconState) error {
 }
 
 func (s *PremineGenesisConfig) setExecutionPayload(g state.BeaconState) error {
-	if s.Version < version.Bellatrix {
-		return nil
-	}
-
 	gb := s.GB
 
 	var ed interfaces.ExecutionData
@@ -560,7 +556,7 @@ func (s *PremineGenesisConfig) setExecutionPayload(g state.BeaconState) error {
 			return err
 		}
 	default:
-		return errUnsupportedVersion
+		return nil
 	}
 	return g.SetLatestExecutionPayloadHeader(ed)
 }

@@ -27,10 +27,10 @@ type BeaconBlockProcessor func(block interfaces.ReadOnlySignedBeaconBlock) error
 
 // SendBeaconBlocksByRangeRequest sends BeaconBlocksByRange and returns fetched blocks, if any.
 func SendBeaconBlocksByRangeRequest(
-	ctx context.Context, chain blockchain.ForkFetcher, p2pProvider p2p.SenderEncoder, pid peer.ID,
+	ctx context.Context, tor blockchain.TemporalOracle, p2pProvider p2p.SenderEncoder, pid peer.ID,
 	req *pb.BeaconBlocksByRangeRequest, blockProcessor BeaconBlockProcessor,
 ) ([]interfaces.ReadOnlySignedBeaconBlock, error) {
-	topic, err := p2p.TopicFromMessage(p2p.BeaconBlocksByRangeMessageName, slots.ToEpoch(chain.CurrentSlot()))
+	topic, err := p2p.TopicFromMessage(p2p.BeaconBlocksByRangeMessageName, slots.ToEpoch(tor.CurrentSlot()))
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func SendBeaconBlocksByRangeRequest(
 	var prevSlot primitives.Slot
 	for i := uint64(0); ; i++ {
 		isFirstChunk := i == 0
-		blk, err := ReadChunkedBlock(stream, chain, p2pProvider, isFirstChunk)
+		blk, err := ReadChunkedBlock(stream, tor, p2pProvider, isFirstChunk)
 		if errors.Is(err, io.EOF) {
 			break
 		}
@@ -89,10 +89,10 @@ func SendBeaconBlocksByRangeRequest(
 
 // SendBeaconBlocksByRootRequest sends BeaconBlocksByRoot and returns fetched blocks, if any.
 func SendBeaconBlocksByRootRequest(
-	ctx context.Context, chain blockchain.ChainInfoFetcher, p2pProvider p2p.P2P, pid peer.ID,
+	ctx context.Context, clock blockchain.TemporalOracle, p2pProvider p2p.P2P, pid peer.ID,
 	req *p2ptypes.BeaconBlockByRootsReq, blockProcessor BeaconBlockProcessor,
 ) ([]interfaces.ReadOnlySignedBeaconBlock, error) {
-	topic, err := p2p.TopicFromMessage(p2p.BeaconBlocksByRootsMessageName, slots.ToEpoch(chain.CurrentSlot()))
+	topic, err := p2p.TopicFromMessage(p2p.BeaconBlocksByRootsMessageName, slots.ToEpoch(clock.CurrentSlot()))
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +117,7 @@ func SendBeaconBlocksByRootRequest(
 			break
 		}
 		isFirstChunk := i == 0
-		blk, err := ReadChunkedBlock(stream, chain, p2pProvider, isFirstChunk)
+		blk, err := ReadChunkedBlock(stream, clock, p2pProvider, isFirstChunk)
 		if errors.Is(err, io.EOF) {
 			break
 		}

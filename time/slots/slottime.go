@@ -189,6 +189,14 @@ func WithinDataAvailabilityBound(genesisTimeSec uint64, epoch primitives.Epoch) 
 	return currentEpoch-params.BeaconNetworkConfig().MinEpochsForBlobsSidecarsRequest >= epoch
 }
 
+// Duration computes the span of time between two instants, represented as Slots.
+func Duration(start, end time.Time) primitives.Slot {
+	if end.Before(start) {
+		return 0
+	}
+	return primitives.Slot(uint64(end.Unix()-start.Unix()) / params.BeaconConfig().SecondsPerSlot)
+}
+
 // ValidateClock validates a provided slot against the local
 // clock to ensure slots that are unreasonable are returned with
 // an error.
@@ -249,7 +257,7 @@ func SyncCommitteePeriodStartEpoch(e primitives.Epoch) (primitives.Epoch, error)
 
 // SecondsSinceSlotStart returns the number of seconds transcurred since the
 // given slot start time
-func SecondsSinceSlotStart(s primitives.Slot, genesisTime uint64, timeStamp uint64) (uint64, error) {
+func SecondsSinceSlotStart(s primitives.Slot, genesisTime, timeStamp uint64) (uint64, error) {
 	if timeStamp < genesisTime+uint64(s)*params.BeaconConfig().SecondsPerSlot {
 		return 0, errors.New("could not compute seconds since slot start: invalid timestamp")
 	}
