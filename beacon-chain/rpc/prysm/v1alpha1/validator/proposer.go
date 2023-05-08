@@ -28,6 +28,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 	"github.com/prysmaticlabs/prysm/v4/time/slots"
@@ -99,6 +100,7 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 	}
 	sBlk.SetProposerIndex(idx)
 
+	var blobs []*enginev1.Blob
 	if features.Get().BuildBlockParallel {
 		if err := vs.BuildBlockParallel(ctx, sBlk, head); err != nil {
 			return nil, errors.Wrap(err, "could not build block in parallel")
@@ -135,7 +137,7 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 		vs.setSyncAggregate(ctx, sBlk)
 
 		// Set execution data. New in Bellatrix.
-		blobs, err := vs.setExecutionData(ctx, sBlk, head)
+		blobs, err = vs.setExecutionData(ctx, sBlk, head)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Could not set execution data: %v", err)
 		}
@@ -254,7 +256,8 @@ func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.Signed
 		vs.setBlsToExecData(sBlk, head)
 	}()
 
-	if err := vs.setExecutionData(ctx, sBlk, head); err != nil {
+	// TODO: handle parallel blob constructions
+	if _, err := vs.setExecutionData(ctx, sBlk, head); err != nil {
 		return status.Errorf(codes.Internal, "Could not set execution data: %v", err)
 	}
 
@@ -268,11 +271,7 @@ func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.Signed
 func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSignedBeaconBlock) (*ethpb.ProposeResponse, error) {
 	ctx, span := trace.StartSpan(ctx, "ProposerServer.ProposeBeaconBlock")
 	defer span.End()
-	blk, err := blocks.NewSignedBeaconBlock(req.Block)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "%s: %v", CouldNotDecodeBlock, err)
-	}
-	return vs.proposeGenericBeaconBlock(ctx, blk)
+	return vs.proposeGenericBeaconBlock(ctx, req)
 }
 
 // PrepareBeaconProposer caches and updates the fee recipient for the given proposer.

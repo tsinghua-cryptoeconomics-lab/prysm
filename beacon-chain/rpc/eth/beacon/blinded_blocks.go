@@ -160,7 +160,7 @@ func (bs *Server) GetBlindedBlockSSZ(ctx context.Context, req *ethpbv1.BlockRequ
 // successful. The beacon node is expected to integrate the new block into its state, and
 // therefore validate the block internally, however blocks which fail the validation are still
 // broadcast but a different status code is returned (202).
-func (bs *Server) SubmitBlindedBlock(ctx context.Context, req *ethpbv2.SignedBlindedBeaconBlockContentsContainer) (*emptypb.Empty, error) {
+func (bs *Server) SubmitBlindedBlock(ctx context.Context, req *ethpbv2.SignedBlindedBeaconBlockContainer) (*emptypb.Empty, error) {
 	ctx, span := trace.StartSpan(ctx, "beacon.SubmitBlindedBlock")
 	defer span.End()
 
@@ -170,24 +170,20 @@ func (bs *Server) SubmitBlindedBlock(ctx context.Context, req *ethpbv2.SignedBli
 	}
 
 	switch blkContainer := req.Message.(type) {
-	case *ethpbv2.SignedBlindedBeaconBlockContentsContainer_DenebContents:
-		if err := bs.submitBlindedDenebContents(ctx, blkContainer.DenebContents); err != nil {
+	case *ethpbv2.SignedBlindedBeaconBlockContainer_CapellaBlock:
+		if err := bs.submitBlindedCapellaBlock(ctx, blkContainer.CapellaBlock, req.Signature); err != nil {
 			return nil, err
 		}
-	case *ethpbv2.SignedBlindedBeaconBlockContentsContainer_CapellaBlock:
-		if err := bs.submitBlindedCapellaBlock(ctx, blkContainer.CapellaBlock.Message, blkContainer.CapellaBlock.Signature); err != nil {
+	case *ethpbv2.SignedBlindedBeaconBlockContainer_BellatrixBlock:
+		if err := bs.submitBlindedBellatrixBlock(ctx, blkContainer.BellatrixBlock, req.Signature); err != nil {
 			return nil, err
 		}
-	case *ethpbv2.SignedBlindedBeaconBlockContentsContainer_BellatrixBlock:
-		if err := bs.submitBlindedBellatrixBlock(ctx, blkContainer.BellatrixBlock.Message, blkContainer.BellatrixBlock.Signature); err != nil {
+	case *ethpbv2.SignedBlindedBeaconBlockContainer_Phase0Block:
+		if err := bs.submitPhase0Block(ctx, blkContainer.Phase0Block, req.Signature); err != nil {
 			return nil, err
 		}
-	case *ethpbv2.SignedBlindedBeaconBlockContentsContainer_Phase0Block:
-		if err := bs.submitPhase0Block(ctx, blkContainer.Phase0Block.Block, blkContainer.Phase0Block.Signature); err != nil {
-			return nil, err
-		}
-	case *ethpbv2.SignedBlindedBeaconBlockContentsContainer_AltairBlock:
-		if err := bs.submitAltairBlock(ctx, blkContainer.AltairBlock.Message, blkContainer.AltairBlock.Signature); err != nil {
+	case *ethpbv2.SignedBlindedBeaconBlockContainer_AltairBlock:
+		if err := bs.submitAltairBlock(ctx, blkContainer.AltairBlock, req.Signature); err != nil {
 			return nil, err
 		}
 	default:
