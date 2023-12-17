@@ -50,6 +50,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 	"github.com/prysmaticlabs/prysm/v4/validator/accounts/wallet"
 	"github.com/prysmaticlabs/prysm/v4/validator/client"
+	"github.com/prysmaticlabs/prysm/v4/validator/db/filesystem"
 	"github.com/prysmaticlabs/prysm/v4/validator/db/iface"
 	"github.com/prysmaticlabs/prysm/v4/validator/db/kv"
 	g "github.com/prysmaticlabs/prysm/v4/validator/graffiti"
@@ -209,7 +210,13 @@ func (c *ValidatorClient) Close() {
 }
 
 func (c *ValidatorClient) initializeFromCLI(cliCtx *cli.Context, router *mux.Router) error {
-	var err error
+	var (
+		valDB iface.ValidatorDB
+		err   error
+	)
+
+	isDatabaseMimimal := cliCtx.Bool(features.EnableMinimalSlashingProtection.Name)
+
 	dataDir := cliCtx.String(flags.WalletDirFlag.Name)
 	if !cliCtx.IsSet(flags.InteropNumValidators.Name) {
 		// Custom Check For Web3Signer
@@ -248,26 +255,40 @@ func (c *ValidatorClient) initializeFromCLI(cliCtx *cli.Context, router *mux.Rou
 				)
 			}
 		}
-		if err := clearDB(cliCtx.Context, dataDir, forceClearFlag); err != nil {
+		if err := clearDB(cliCtx.Context, dataDir, forceClearFlag, isDatabaseMimimal); err != nil {
 			return err
 		}
 	} else {
-		dataFile := filepath.Join(dataDir, kv.ProtectionDbFileName)
-		if !file.Exists(dataFile) {
+		path := filepath.Join(dataDir, kv.ProtectionDbFileName)
+		exists := file.Exists(filepath.Join(dataDir, kv.ProtectionDbFileName))
+		if isDatabaseMimimal {
+			path = filepath.Join(dataDir, filesystem.SlashingProtectionDirName)
+			exists, err = file.HasDir(path)
+			if err != nil {
+				return errors.Wrapf(err, "could not check if directory %s exists", path)
+			}
+		}
+
+		if !exists {
 			log.Warnf("Slashing protection file %s is missing.\n"+
 				"If you changed your --wallet-dir or --datadir, please copy your previous \"validator.db\" file into your current --datadir.\n"+
-				"Disregard this warning if this is the first time you are running this set of keys.", dataFile)
+				"Disregard this warning if this is the first time you are running this set of keys.", path)
 		}
 	}
 	log.WithField("databasePath", dataDir).Info("Checking DB")
 
-	valDB, err := kv.NewKVStore(cliCtx.Context, dataDir, &kv.Config{
-		PubKeys: nil,
-	})
-	if err != nil {
-		return errors.Wrap(err, "could not initialize db")
+	if isDatabaseMimimal {
+		valDB, err = filesystem.NewStore(dataDir, nil)
+	} else {
+		valDB, err = kv.NewKVStore(cliCtx.Context, dataDir, nil)
 	}
+
+	if err != nil {
+		return errors.Wrap(err, "could not create validator database")
+	}
+
 	c.db = valDB
+
 	if err := valDB.RunUpMigrations(cliCtx.Context); err != nil {
 		return errors.Wrap(err, "could not run database migration")
 	}
@@ -292,7 +313,13 @@ func (c *ValidatorClient) initializeFromCLI(cliCtx *cli.Context, router *mux.Rou
 }
 
 func (c *ValidatorClient) initializeForWeb(cliCtx *cli.Context, router *mux.Router) error {
-	var err error
+	var (
+		valDB iface.ValidatorDB
+		err   error
+	)
+
+	isDatabaseMimimal := cliCtx.Bool(features.EnableMinimalSlashingProtection.Name)
+
 	dataDir := cliCtx.String(flags.WalletDirFlag.Name)
 	if cliCtx.IsSet(flags.Web3SignerURLFlag.Name) {
 		c.wallet = wallet.NewWalletForWeb3Signer()
@@ -332,17 +359,22 @@ func (c *ValidatorClient) initializeForWeb(cliCtx *cli.Context, router *mux.Rout
 				)
 			}
 		}
-		if err := clearDB(cliCtx.Context, dataDir, forceClearFlag); err != nil {
+		if err := clearDB(cliCtx.Context, dataDir, forceClearFlag, isDatabaseMimimal); err != nil {
 			return err
 		}
 	}
 	log.WithField("databasePath", dataDir).Info("Checking DB")
-	valDB, err := kv.NewKVStore(cliCtx.Context, dataDir, &kv.Config{
-		PubKeys: nil,
-	})
-	if err != nil {
-		return errors.Wrap(err, "could not initialize db")
+
+	if isDatabaseMimimal {
+		valDB, err = filesystem.NewStore(dataDir, nil)
+	} else {
+		valDB, err = kv.NewKVStore(cliCtx.Context, dataDir, nil)
 	}
+
+	if err != nil {
+		return errors.Wrap(err, "could not create validator database")
+	}
+
 	c.db = valDB
 	if err := valDB.RunUpMigrations(cliCtx.Context); err != nil {
 		return errors.Wrap(err, "could not run database migration")
@@ -685,6 +717,11 @@ func overrideBuilderSettings(settings *validatorServiceConfig.ProposerSettings, 
 	if builderConfigFromFlag == nil {
 		log.Infof("proposer settings loaded from db. validator registration to builder is not enabled, please use the --%s flag if you wish to use a builder.", flags.EnableBuilderFlag.Name)
 	}
+
+	if settings == nil {
+		return
+	}
+
 	if settings.ProposeConfig != nil {
 		for key := range settings.ProposeConfig {
 			settings.ProposeConfig[key].BuilderConfig = builderConfigFromFlag
@@ -883,8 +920,12 @@ func setWalletPasswordFilePath(cliCtx *cli.Context) error {
 	return nil
 }
 
-func clearDB(ctx context.Context, dataDir string, force bool) error {
-	var err error
+func clearDB(ctx context.Context, dataDir string, force bool, isDatabaseMinimal bool) error {
+	var (
+		valDB iface.ValidatorDB
+		err   error
+	)
+
 	clearDBConfirmed := force
 
 	if !force {
@@ -898,10 +939,16 @@ func clearDB(ctx context.Context, dataDir string, force bool) error {
 	}
 
 	if clearDBConfirmed {
-		valDB, err := kv.NewKVStore(ctx, dataDir, &kv.Config{})
-		if err != nil {
-			return errors.Wrapf(err, "Could not create DB in dir %s", dataDir)
+		if isDatabaseMinimal {
+			valDB, err = filesystem.NewStore(dataDir, nil)
+		} else {
+			valDB, err = kv.NewKVStore(ctx, dataDir, nil)
 		}
+
+		if err != nil {
+			return errors.Wrap(err, "could not create validator database")
+		}
+
 		if err := valDB.Close(); err != nil {
 			return errors.Wrapf(err, "could not close DB in dir %s", dataDir)
 		}

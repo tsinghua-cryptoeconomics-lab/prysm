@@ -71,7 +71,7 @@ func TestNode_Builds(t *testing.T) {
 func TestClearDB(t *testing.T) {
 	hook := logtest.NewGlobal()
 	tmp := filepath.Join(t.TempDir(), "datadirtest")
-	require.NoError(t, clearDB(context.Background(), tmp, true))
+	require.NoError(t, clearDB(context.Background(), tmp, true, false))
 	require.LogsContain(t, hook, "Removing database")
 }
 
