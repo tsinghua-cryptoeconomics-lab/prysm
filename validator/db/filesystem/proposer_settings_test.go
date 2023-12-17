@@ -18,18 +18,18 @@ func TestStore_ProposerSettings_SaveProposerSettings(t *testing.T) {
 
 	var expected *validatorServiceConfig.ProposerSettings
 
-	// We check `ProposerSettings` returns nil
+	// We check `ProposerSettings` returns on error
 	actual, err := store.ProposerSettings(context.Background())
-	require.NoError(t, err, "ProposerSettings should not return an error")
+	require.ErrorContains(t, ErrNoProposerSettingsFound.Error(), err)
 	require.Equal(t, expected, actual, "ProposerSettings should return nil")
 
 	// Create empty configuration
 	err = store.saveConfiguration(&Configuration{})
 	require.NoError(t, err, "saveConfiguration should not return an error")
 
-	// We check `ProposerSettings` returns nil
+	// We check `ProposerSettings` returns on error
 	actual, err = store.ProposerSettings(context.Background())
-	require.NoError(t, err, "ProposerSettings should not return an error")
+	require.ErrorContains(t, ErrNoProposerSettingsFound.Error(), err)
 	require.Equal(t, expected, actual, "ProposerSettings should return nil")
 
 	// We save some proposer settings
@@ -105,11 +105,9 @@ func TestStore_UpdateProposerSettingsDefault(t *testing.T) {
 	err = store.UpdateProposerSettingsDefault(context.Background(), nil)
 	require.NoError(t, err, "UpdateProposerSettingsDefault should not return an error")
 
-	// We check `ProposerSettings` returns nil
-	var expected *validatorServiceConfig.ProposerSettings
-	actual, err := store.ProposerSettings(context.Background())
-	require.NoError(t, err, "ProposerSettings should not return an error")
-	require.DeepEqual(t, expected, actual, "ProposerSettings should return nil")
+	// We check `ProposerSettings` returns on error
+	_, err = store.ProposerSettings(context.Background())
+	require.ErrorContains(t, ErrNoProposerSettingsFound.Error(), err)
 
 	// We save some proposer settings
 	feeRecipientHex := "0x1111111111111111111111111111111111111111"
@@ -185,11 +183,9 @@ func TestStore_UpdateProposerSettingsForPubkey(t *testing.T) {
 	err = store.UpdateProposerSettingsForPubkey(context.Background(), pubkey, nil)
 	require.NoError(t, err, "UpdateProposerSettingsForPubkey should not return an error")
 
-	// We check `ProposerSettings` returns nil
-	var expected *validatorServiceConfig.ProposerSettings
-	actual, err := store.ProposerSettings(context.Background())
-	require.NoError(t, err, "ProposerSettings should not return an error")
-	require.DeepEqual(t, expected, actual, "ProposerSettings should return nil")
+	// We check `ProposerSettings` returns on error
+	_, err = store.ProposerSettings(context.Background())
+	require.ErrorContains(t, ErrNoProposerSettingsFound.Error(), err)
 
 	// We save some proposer settings for the given pubkey
 	feeRecipientHex := "0x1111111111111111111111111111111111111111"
