@@ -2,7 +2,6 @@ package validator
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"strings"
 	"sync"
@@ -191,86 +190,156 @@ func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.Signed
 	return nil
 }
 
-// ProposeBeaconBlock is called by a proposer during its assigned slot to create a block in an attempt
-// to get it processed by the beacon node as the canonical head.
 func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSignedBeaconBlock) (*ethpb.ProposeResponse, error) {
 	ctx, span := trace.StartSpan(ctx, "ProposerServer.ProposeBeaconBlock")
 	defer span.End()
 
 	blk, err := blocks.NewSignedBeaconBlock(req.Block)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "%s: %v", CouldNotDecodeBlock, err)
-	}
-
-	unblinder, err := newUnblinder(blk, vs.BlockBuilder)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not create unblinder")
-	}
-	blinded := unblinder.b.IsBlinded() //
-
-	var scs []*ethpb.BlobSidecar
-	blk, scs, err = unblinder.unblindBuilderBlock(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not unblind builder block")
-	}
-
-	// Broadcast the new block to the network.
-	blkPb, err := blk.Proto()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not get protobuf block")
-	}
-	if err := vs.P2P.Broadcast(ctx, blkPb); err != nil {
-		return nil, fmt.Errorf("could not broadcast block: %v", err)
+		return nil, errors.Wrap(err, CouldNotDecodeBlock)
 	}
 
 	root, err := blk.Block().HashTreeRoot()
 	if err != nil {
-		return nil, fmt.Errorf("could not tree hash block: %v", err)
+		return nil, errors.Wrap(err, "could not tree hash block")
 	}
-	log.WithFields(logrus.Fields{
-		"blockRoot": hex.EncodeToString(root[:]),
-	}).Debug("Broadcasting block")
 
-	if blk.Version() >= version.Deneb {
-		if !blinded {
-			dbBlockContents := req.GetDeneb()
-			if dbBlockContents == nil {
-				return nil, errors.New("signed beacon block contents is empty")
-			}
-			scs, err = buildBlobSidecars(blk, dbBlockContents.Blobs, dbBlockContents.KzgProofs)
-			if err != nil {
-				return nil, fmt.Errorf("could not build blob sidecars: %v", err)
-			}
+	if !blk.IsBlinded() {
+		if err := vs.handleBlockBroadcast(ctx, blk, req); err != nil {
+			return nil, err
+		}
+	} else {
+		if blk.Version() < version.Bellatrix {
+			return nil, errors.New("blinded block received before Bellatrix fork")
+		}
+		if vs.BlockBuilder == nil || !vs.BlockBuilder.Configured() {
+			return nil, errors.New("nil builder provided")
+		}
+		c, err := blk.Copy()
+		if err != nil {
+			return nil, errors.Wrap(err, "could not copy block")
+		}
+		copied, ok := c.(interfaces.SignedBeaconBlock)
+		if !ok {
+			return nil, errors.New("could not cast copied block to SignedBeaconBlock")
+		}
+		payload, bundle, err := vs.BlockBuilder.SubmitBlindedBlock(ctx, blk)
+		if err != nil {
+			return nil, errors.Wrap(err, "could not submit blinded block")
+		}
+		if _, err := copied.Unblind(payload); err != nil {
+			return nil, errors.Wrap(err, "could not unblind block")
+		}
+
+		txs, err := payload.Transactions()
+		if err != nil {
+			return nil, errors.Wrap(err, "could not get transactions from payload")
+		}
+
+		scs, err := unblindBlobsSidecars(copied, bundle)
+		if err != nil {
+			return nil, errors.Wrap(err, "could not unblind blobs sidecars")
+		}
+
+		if copied.Version() >= version.Deneb && bundle != nil {
+			log.WithField("blobCount", len(bundle.Blobs))
+		}
+
+		log.WithFields(logrus.Fields{
+			"blockHash":    fmt.Sprintf("%#x", payload.BlockHash()),
+			"feeRecipient": fmt.Sprintf("%#x", payload.FeeRecipient()),
+			"gasUsed":      payload.GasUsed(),
+			"slot":         copied.Block().Slot(),
+			"txs":          len(txs),
+		}).Info("Retrieved full payload from builder")
+
+		blkPb, err := blk.Proto()
+		if err != nil {
+			return nil, errors.Wrap(err, "could not get protobuf block")
+		}
+		if err := vs.P2P.Broadcast(ctx, blkPb); err != nil {
+			return nil, errors.Wrap(err, "could not broadcast block")
 		}
 		for i, sc := range scs {
 			if err := vs.P2P.BroadcastBlob(ctx, uint64(i), sc); err != nil {
 				log.WithError(err).Error("Could not broadcast blob")
 			}
+
 			readOnlySc, err := blocks.NewROBlobWithRoot(sc, root)
 			if err != nil {
-				return nil, fmt.Errorf("could not create ROBlob: %v", err)
+				return nil, errors.Wrap(err, "could not create ROBlob")
 			}
 			verifiedSc := blocks.NewVerifiedROBlob(readOnlySc)
 			if err := vs.BlobReceiver.ReceiveBlob(ctx, verifiedSc); err != nil {
 				log.WithError(err).Error("Could not receive blob")
 			}
 		}
+		if err := vs.BlockReceiver.ReceiveBlock(ctx, blk, root); err != nil {
+			return nil, fmt.Errorf("could not process beacon block: %v", err)
+		}
+
 	}
 
-	if err := vs.BlockReceiver.ReceiveBlock(ctx, blk, root); err != nil {
-		return nil, fmt.Errorf("could not process beacon block: %v", err)
-	}
+	log.WithField("slot", blk.Block().Slot()).Debug("Block proposal received via RPC")
 
-	log.WithField("slot", blk.Block().Slot()).Debugf(
-		"Block proposal received via RPC")
 	vs.BlockNotifier.BlockFeed().Send(&feed.Event{
 		Type: blockfeed.ReceivedBlock,
 		Data: &blockfeed.ReceivedBlockData{SignedBlock: blk},
 	})
 
-	return &ethpb.ProposeResponse{
-		BlockRoot: root[:],
-	}, nil
+	return &ethpb.ProposeResponse{BlockRoot: root[:]}, nil
+}
+
+func (vs *Server) handleBlockBroadcast(ctx context.Context, blk interfaces.SignedBeaconBlock, req *ethpb.GenericSignedBeaconBlock) error {
+	blkPb, err := blk.Proto()
+	if err != nil {
+		return errors.Wrap(err, "could not get protobuf block")
+	}
+
+	if err := vs.P2P.Broadcast(ctx, blkPb); err != nil {
+		return errors.Wrap(err, "could not broadcast block")
+	}
+
+	dbBlockContents := req.GetDeneb()
+	if dbBlockContents == nil {
+		return nil
+	}
+
+	scs, err := buildBlobSidecars(blk, dbBlockContents.Blobs, dbBlockContents.KzgProofs)
+	if err != nil {
+		return errors.Wrap(err, "could not build blob sidecars")
+	}
+
+	return vs.broadcastAndReceiveBlobs(ctx, scs, blk)
+}
+
+func (vs *Server) broadcastAndReceiveBlobs(ctx context.Context, scs []*ethpb.BlobSidecar, blk interfaces.SignedBeaconBlock) error {
+	root, err := blk.Block().HashTreeRoot()
+	if err != nil {
+		return errors.Wrap(err, "could not tree hash block")
+	}
+
+	for i, sc := range scs {
+		if err := vs.P2P.BroadcastBlob(ctx, uint64(i), sc); err != nil {
+			log.WithError(err).Error("Could not broadcast blob")
+		}
+
+		readOnlySc, err := blocks.NewROBlobWithRoot(sc, root)
+		if err != nil {
+			return errors.Wrap(err, "could not create ROBlob")
+		}
+
+		verifiedSc := blocks.NewVerifiedROBlob(readOnlySc)
+		if err := vs.BlobReceiver.ReceiveBlob(ctx, verifiedSc); err != nil {
+			log.WithError(err).Error("Could not receive blob")
+		}
+	}
+
+	if err := vs.BlockReceiver.ReceiveBlock(ctx, blk, root); err != nil {
+		return fmt.Errorf("could not process beacon block: %v", err)
+	}
+
+	return nil
 }
 
 // PrepareBeaconProposer caches and updates the fee recipient for the given proposer.

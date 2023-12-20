@@ -333,6 +333,35 @@ func (b *SignedBeaconBlock) ToBlinded() (interfaces.ReadOnlySignedBeaconBlock, e
 	}
 }
 
+func (b *SignedBeaconBlock) Unblind(e interfaces.ExecutionData) (interfaces.ReadOnlySignedBeaconBlock, error) {
+	if e.IsNil() {
+		return nil, errors.New("cannot unblind with nil execution data")
+	}
+	if b.IsBlinded() {
+		return nil, errors.New("cannot unblind with an blinded execution data")
+	}
+	payloadRoot, err := e.HashTreeRoot()
+	if err != nil {
+		return nil, err
+	}
+	header, err := b.Block().Body().Execution()
+	if err != nil {
+		return nil, err
+	}
+	headerRoot, err := header.HashTreeRoot()
+	if err != nil {
+		return nil, err
+	}
+	if payloadRoot != headerRoot {
+		return nil, errors.New("cannot unblind with different execution data")
+	}
+	b.SetBlinded(false)
+	if err := b.SetExecution(e); err != nil {
+		return nil, err
+	}
+	return b, nil
+}
+
 // Version of the underlying protobuf object.
 func (b *SignedBeaconBlock) Version() int {
 	return b.version
