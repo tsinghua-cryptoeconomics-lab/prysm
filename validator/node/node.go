@@ -215,7 +215,7 @@ func (c *ValidatorClient) initializeFromCLI(cliCtx *cli.Context, router *mux.Rou
 		err   error
 	)
 
-	isDatabaseMimimal := cliCtx.Bool(features.EnableMinimalSlashingProtection.Name)
+	isMinimalSlashingProtectionRequested := cliCtx.Bool(features.EnableMinimalSlashingProtection.Name)
 
 	dataDir := cliCtx.String(flags.WalletDirFlag.Name)
 	if !cliCtx.IsSet(flags.InteropNumValidators.Name) {
@@ -223,7 +223,6 @@ func (c *ValidatorClient) initializeFromCLI(cliCtx *cli.Context, router *mux.Rou
 		if cliCtx.IsSet(flags.Web3SignerURLFlag.Name) {
 			c.wallet = wallet.NewWalletForWeb3Signer()
 		} else {
-			fmt.Println("initializeFromCLI asking for wallet")
 			w, err := wallet.OpenWalletOrElseCli(cliCtx, func(cliCtx *cli.Context) (*wallet.Wallet, error) {
 				return nil, wallet.ErrNoWalletFound
 			})
@@ -255,13 +254,13 @@ func (c *ValidatorClient) initializeFromCLI(cliCtx *cli.Context, router *mux.Rou
 				)
 			}
 		}
-		if err := clearDB(cliCtx.Context, dataDir, forceClearFlag, isDatabaseMimimal); err != nil {
+		if err := clearDB(cliCtx.Context, dataDir, forceClearFlag, isMinimalSlashingProtectionRequested); err != nil {
 			return err
 		}
 	} else {
 		path := filepath.Join(dataDir, kv.ProtectionDbFileName)
 		exists := file.Exists(filepath.Join(dataDir, kv.ProtectionDbFileName))
-		if isDatabaseMimimal {
+		if isMinimalSlashingProtectionRequested {
 			path = filepath.Join(dataDir, filesystem.SlashingProtectionDirName)
 			exists, err = file.HasDir(path)
 			if err != nil {
@@ -277,7 +276,32 @@ func (c *ValidatorClient) initializeFromCLI(cliCtx *cli.Context, router *mux.Rou
 	}
 	log.WithField("databasePath", dataDir).Info("Checking DB")
 
-	if isDatabaseMimimal {
+	// Check if a complete database exists
+	completeDatabasePath := filepath.Join(dataDir, kv.ProtectionDbFileName)
+	completeDatabaseExists := false
+	if _, err := os.Stat(completeDatabasePath); err == nil {
+		completeDatabaseExists = true
+	} else if !os.IsNotExist(err) {
+		return errors.Wrapf(err, "could not stat file %s", completeDatabasePath)
+	}
+
+	useMinimalSlashingProtection := isMinimalSlashingProtectionRequested
+
+	// If a complete database exists AND minimal slashing protection is requested, use complete database.
+	if isMinimalSlashingProtectionRequested && completeDatabaseExists {
+		log.Warning("Minimal slashing protection database requested, while complete slashing protection database currently used.")
+		log.Warning("Will continue to use complete slashing protection database.")
+
+		log.Warnf(
+			"Please delete the complete slashing protection database located at `%s` and re-run the validator client with --%s if you want to use minimal slashing protection.",
+			completeDatabasePath,
+			features.EnableMinimalSlashingProtection.Name,
+		)
+
+		useMinimalSlashingProtection = false
+	}
+
+	if useMinimalSlashingProtection {
 		valDB, err = filesystem.NewStore(dataDir, nil)
 	} else {
 		valDB, err = kv.NewKVStore(cliCtx.Context, dataDir, nil)
@@ -318,7 +342,7 @@ func (c *ValidatorClient) initializeForWeb(cliCtx *cli.Context, router *mux.Rout
 		err   error
 	)
 
-	isDatabaseMimimal := cliCtx.Bool(features.EnableMinimalSlashingProtection.Name)
+	isMinimalSlashingProtectionRequested := cliCtx.Bool(features.EnableMinimalSlashingProtection.Name)
 
 	dataDir := cliCtx.String(flags.WalletDirFlag.Name)
 	if cliCtx.IsSet(flags.Web3SignerURLFlag.Name) {
@@ -359,13 +383,38 @@ func (c *ValidatorClient) initializeForWeb(cliCtx *cli.Context, router *mux.Rout
 				)
 			}
 		}
-		if err := clearDB(cliCtx.Context, dataDir, forceClearFlag, isDatabaseMimimal); err != nil {
+		if err := clearDB(cliCtx.Context, dataDir, forceClearFlag, isMinimalSlashingProtectionRequested); err != nil {
 			return err
 		}
 	}
 	log.WithField("databasePath", dataDir).Info("Checking DB")
 
-	if isDatabaseMimimal {
+	// Check if a complete database exists
+	completeDatabasePath := filepath.Join(dataDir, kv.ProtectionDbFileName)
+	completeDatabaseExists := false
+	if _, err := os.Stat(completeDatabasePath); err == nil {
+		completeDatabaseExists = true
+	} else if !os.IsNotExist(err) {
+		return errors.Wrapf(err, "could not stat file %s", completeDatabasePath)
+	}
+
+	useMinimalSlashingProtection := isMinimalSlashingProtectionRequested
+
+	// If a complete database exists AND minimal slashing protection is requested, use complete database.
+	if isMinimalSlashingProtectionRequested && completeDatabaseExists {
+		log.Warning("Minimal slashing protection database requested, while complete slashing protection database currently used.")
+		log.Warning("Will continue to use complete slashing protection database.")
+
+		log.Warnf(
+			"Please delete the complete slashing protection database located at `%s` and re-run the validator client with --%s if you want to use minimal slashing protection.",
+			completeDatabasePath,
+			features.EnableMinimalSlashingProtection.Name,
+		)
+
+		useMinimalSlashingProtection = false
+	}
+
+	if useMinimalSlashingProtection {
 		valDB, err = filesystem.NewStore(dataDir, nil)
 	} else {
 		valDB, err = kv.NewKVStore(cliCtx.Context, dataDir, nil)
