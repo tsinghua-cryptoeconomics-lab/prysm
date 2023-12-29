@@ -237,6 +237,22 @@ func (s *Service) Start() {
 			"activePeers": len(s.peers.Active()),
 		}).Info("Peer summary")
 	})
+	async.RunEvery(s.ctx, 3*time.Minute, func() {
+		for _, pid := range s.peers.Connected() {
+			blockScore := s.peers.Scorers().BlockProviderScorer().Score(pid)
+			gossipScore := s.peers.Scorers().GossipScorer().Score(pid)
+			statusScore := s.peers.Scorers().PeerStatusScorer().Score(pid)
+			badRespnseScore := s.peers.Scorers().BadResponsesScorer().Score(pid)
+			log.WithFields(logrus.Fields{
+				"peer":             pid,
+				"blockScore":       blockScore,
+				"gossipScore":      gossipScore,
+				"statusScore":      statusScore,
+				"badResponseScore": badRespnseScore,
+			}).Info("Peer scores summary")
+
+		}
+	})
 
 	multiAddrs := s.host.Network().ListenAddresses()
 	logIPAddr(s.host.ID(), multiAddrs...)
