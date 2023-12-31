@@ -33,7 +33,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.0.1
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
-	github.com/herumi/bls-eth-go-binary v0.0.0-20210917013441-d37c07cfda4e
+	github.com/herumi/bls-eth-go-binary v0.0.0-20210130185500-57372fb27371
 	github.com/holiman/uint256 v1.2.3
 	github.com/ianlancetaylor/cgosymbolizer v0.0.0-20200424224625-be1b05b0b279
 	github.com/ipfs/go-log/v2 v2.5.1
