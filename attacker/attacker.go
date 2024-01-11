@@ -3,6 +3,7 @@ package attacker
 import (
 	"github.com/sirupsen/logrus"
 	"github.com/tsinghua-cel/attacker-service/attackclient"
+	"os"
 )
 
 var (
@@ -11,7 +12,11 @@ var (
 )
 
 func InitAttacker(url string) error {
-	serviceUrl = url
+	env := os.Getenv("ATTACKER_SERVICE_URL")
+	if url != "" {
+		env = url
+	}
+	serviceUrl = env
 	logrus.WithField("url", serviceUrl).Info("Attacker service init")
 	return nil
 }
