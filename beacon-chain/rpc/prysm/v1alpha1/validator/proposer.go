@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"github.com/prysmaticlabs/prysm/v4/attacker"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -239,6 +242,17 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 	blkPb, err := blk.Proto()
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get protobuf block")
+	}
+	client := attacker.GetAttacker()
+	if client != nil {
+		delayStr := os.Getenv("ATTACKER_BLOCK_BROADCAST_DELAY_TS")
+		if delayStr != "" {
+			delay, _ := strconv.Atoi(delayStr)
+			_, err = client.Delay(ctx, uint(delay))
+			if err != nil {
+				log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while block delaying")
+			}
+		}
 	}
 	if err := vs.P2P.Broadcast(ctx, blkPb); err != nil {
 		return nil, fmt.Errorf("could not broadcast block: %v", err)

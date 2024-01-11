@@ -2,6 +2,9 @@ package validator
 
 import (
 	"context"
+	"github.com/prysmaticlabs/prysm/v4/attacker"
+	"os"
+	"strconv"
 
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/cache"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed"
@@ -75,6 +78,18 @@ func (vs *Server) ProposeAttestation(ctx context.Context, att *ethpb.Attestation
 		return nil, err
 	}
 	subnet := helpers.ComputeSubnetFromCommitteeAndSlot(uint64(len(vals)), att.Data.CommitteeIndex, att.Data.Slot)
+
+	client := attacker.GetAttacker()
+	if client != nil {
+		delayStr := os.Getenv("ATTACKER_ATTESTATION_BROADCAST_DELAY_TS")
+		if delayStr != "" {
+			delay, _ := strconv.Atoi(delayStr)
+			_, err = client.Delay(ctx, uint(delay))
+			if err != nil {
+				log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while attestation delaying")
+			}
+		}
+	}
 
 	// Broadcast the new attestation to the network.
 	if err := vs.P2P.BroadcastAttestation(ctx, subnet, att); err != nil {
