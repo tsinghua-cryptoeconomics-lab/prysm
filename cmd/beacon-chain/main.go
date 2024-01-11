@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/prysmaticlabs/prysm/v4/attacker"
 	"os"
 	"path/filepath"
 	runtimeDebug "runtime/debug"
@@ -93,6 +94,7 @@ var appFlags = []cli.Flag{
 	cmd.P2PMaxPeers,
 	cmd.P2PPrivKey,
 	cmd.P2PPrivHex,
+	cmd.Attacker,
 	cmd.P2PStaticID,
 	cmd.P2PMetadata,
 	cmd.P2PAllowList,
@@ -289,6 +291,7 @@ func startNode(ctx *cli.Context) error {
 			opts = append(opts, ofo)
 		}
 	}
+	attacker.InitAttacker(ctx.String(cmd.Attacker.Name))
 
 	beacon, err := node.New(ctx, opts...)
 	if err != nil {
