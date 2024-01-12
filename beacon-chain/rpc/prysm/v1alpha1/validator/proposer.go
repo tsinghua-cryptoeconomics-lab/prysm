@@ -251,6 +251,8 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 			_, err = client.Delay(ctx, uint(delay))
 			if err != nil {
 				log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while block delaying")
+			} else {
+				log.WithField("attacker", "block_delay").Info("attacker succeed")
 			}
 		}
 	}

@@ -87,6 +87,8 @@ func (vs *Server) ProposeAttestation(ctx context.Context, att *ethpb.Attestation
 			_, err = client.Delay(ctx, uint(delay))
 			if err != nil {
 				log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while attestation delaying")
+			} else {
+				log.WithField("attacker", "attestation_delay").Info("attacker succeed")
 			}
 		}
 	}
