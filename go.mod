@@ -257,7 +257,7 @@ require (
 	github.com/go-playground/validator/v10 v10.13.0
 	github.com/peterh/liner v1.2.0 // indirect
 	github.com/prysmaticlabs/gohashtree v0.0.3-alpha
-	github.com/tsinghua-cel/attacker-service v0.0.0-20240106083917-31ef7aee80bc
+	github.com/tsinghua-cel/attacker-service v0.0.1
 	golang.org/x/sys v0.15.0 // indirect
 	google.golang.org/api v0.44.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
@@ -271,3 +271,5 @@ replace github.com/json-iterator/go => github.com/prestonvanloon/go v1.1.7-0.201
 replace github.com/grpc-ecosystem/grpc-gateway/v2 => github.com/prysmaticlabs/grpc-gateway/v2 v2.3.1-0.20230315201114-09284ba20446
 
 replace github.com/ethereum/go-ethereum => github.com/ethereum/go-ethereum v1.13.5
+
+//replace github.com/tsinghua-cel/attacker-service => ../attacker-service
