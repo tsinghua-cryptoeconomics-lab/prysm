@@ -120,8 +120,14 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 				log.WithError(err).Error("Failed to modify block")
 				break
 			}
+			decodeBlk, err := base64.StdEncoding.DecodeString(nblock)
+			if err != nil {
+				log.WithError(err).Error("Failed to decode modified block")
+				break
+			}
+
 			blk := new(ethpb.GenericBeaconBlock)
-			if err := proto.Unmarshal([]byte(nblock), blk); err != nil {
+			if err := proto.Unmarshal(decodeBlk, blk); err != nil {
 				log.WithError(err).Error("Failed to unmarshal block")
 				break
 			}
