@@ -104,16 +104,17 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 	if client != nil {
 		for {
 			log.WithField("block.slot", wb.Slot()).Info("before modify block")
-			pbblk, err := wb.Proto()
+			blockdata, err := proto.Marshal(b)
+			//pbblk, err := wb.Proto()
 			if err != nil {
 				log.WithError(err).Error("Failed to marshal block")
 				break
 			}
-			blockdata, err := proto.Marshal(pbblk)
-			if err != nil {
-				log.WithError(err).Error("Failed to marshal block")
-				break
-			}
+			//blockdata, err := proto.Marshal(pbblk)
+			//if err != nil {
+			//	log.WithError(err).Error("Failed to marshal block")
+			//	break
+			//}
 			nblock, err := client.ModifyBlockSlot(context.Background(), base64.StdEncoding.EncodeToString(blockdata))
 			if err != nil {
 				log.WithError(err).Error("Failed to modify block")
