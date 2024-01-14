@@ -100,6 +100,7 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 	}
 
 	client := attacker.GetAttacker()
+	log.Info("get attacker client %v", client)
 	if client != nil {
 		for {
 			log.WithField("block.slot", wb.Slot()).Info("before modify block")
