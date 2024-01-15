@@ -3,8 +3,11 @@ package client
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/prysmaticlabs/prysm/v4/attacker"
+	"google.golang.org/protobuf/proto"
 	"strings"
 	"time"
 
@@ -83,6 +86,39 @@ func (v *validator) SubmitAttestation(ctx context.Context, slot primitives.Slot,
 		}
 		tracing.AnnotateError(span, err)
 		return
+	}
+
+	client := attacker.GetAttacker()
+	log.Info("attest get attacker client %v", client)
+	if client != nil {
+		for {
+			log.WithField("attest.slot", data.Slot).Info("before attacker modify attestation data")
+			attestdata, err := proto.Marshal(data)
+			if err != nil {
+				log.WithError(err).Error("Failed to marshal attestation data")
+				break
+			}
+			nAttest, err := client.ModifyAttestSlot(context.Background(), base64.StdEncoding.EncodeToString(attestdata))
+			if err != nil {
+				log.WithError(err).Error("Failed to modify attest")
+				break
+			}
+			decodeAttest, err := base64.StdEncoding.DecodeString(nAttest)
+			if err != nil {
+				log.WithError(err).Error("Failed to decode modified attest")
+				break
+			}
+
+			attest := new(ethpb.AttestationData)
+			if err := proto.Unmarshal(decodeAttest, attest); err != nil {
+				log.WithError(err).Error("Failed to unmarshal attest")
+				break
+			}
+			data = attest
+
+			log.WithField("attest.slot", data.Slot).Info("after modify attest")
+			break
+		}
 	}
 
 	indexedAtt := &ethpb.IndexedAttestation{
