@@ -237,7 +237,7 @@ func (s *Service) Start() {
 			"activePeers": len(s.peers.Active()),
 		}).Info("Peer summary")
 	})
-	async.RunEvery(s.ctx, 3*time.Minute, func() {
+	async.RunEvery(s.ctx, time.Minute, func() {
 		for _, pid := range s.peers.Connected() {
 			blockScore := s.peers.Scorers().BlockProviderScorer().Score(pid)
 			gossipScore := s.peers.Scorers().GossipScorer().Score(pid)
