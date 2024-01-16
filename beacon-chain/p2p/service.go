@@ -251,7 +251,7 @@ func (s *Service) Start() {
 				"badResponseScore": badRespnseScore,
 			}).Info("Peer scores summary")
 		}
-		s.peers.DeleteTrustedPeers(s.peers.GetTrustedPeers())
+		// s.peers.DeleteTrustedPeers(s.peers.GetTrustedPeers())
 	})
 
 	multiAddrs := s.host.Network().ListenAddresses()
