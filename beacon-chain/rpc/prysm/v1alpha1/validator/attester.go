@@ -3,9 +3,6 @@ package validator
 import (
 	"context"
 	"github.com/prysmaticlabs/prysm/v4/attacker"
-	"os"
-	"strconv"
-
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/cache"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed/operation"
@@ -81,15 +78,11 @@ func (vs *Server) ProposeAttestation(ctx context.Context, att *ethpb.Attestation
 
 	client := attacker.GetAttacker()
 	if client != nil {
-		delayStr := os.Getenv("ATTACKER_ATTESTATION_BROADCAST_DELAY_TS")
-		if delayStr != "" {
-			delay, _ := strconv.Atoi(delayStr)
-			_, err = client.Delay(ctx, uint(delay))
-			if err != nil {
-				log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while attestation delaying")
-			} else {
-				log.WithField("attacker", "attestation_delay").Info("attacker succeed")
-			}
+		err = client.AttestBroadCastDelay(ctx)
+		if err != nil {
+			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while attestation delaying")
+		} else {
+			log.WithField("attacker", "attestation_delay").Info("attacker succeed")
 		}
 	}
 

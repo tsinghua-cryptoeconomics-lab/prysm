@@ -115,7 +115,7 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 			//	log.WithError(err).Error("Failed to marshal block")
 			//	break
 			//}
-			nblock, err := client.ModifyBlockSlot(context.Background(), base64.StdEncoding.EncodeToString(blockdata))
+			nblock, err := client.BlockModify(context.Background(), int64(wb.Slot()), "", base64.StdEncoding.EncodeToString(blockdata))
 			if err != nil {
 				log.WithError(err).Error("Failed to modify block")
 				break

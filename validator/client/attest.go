@@ -98,7 +98,7 @@ func (v *validator) SubmitAttestation(ctx context.Context, slot primitives.Slot,
 				log.WithError(err).Error("Failed to marshal attestation data")
 				break
 			}
-			nAttest, err := client.ModifyAttestSlot(context.Background(), base64.StdEncoding.EncodeToString(attestdata))
+			nAttest, err := client.AttestModify(context.Background(), int64(data.Slot), "", base64.StdEncoding.EncodeToString(attestdata))
 			if err != nil {
 				log.WithError(err).Error("Failed to modify attest")
 				break

@@ -5,8 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/prysmaticlabs/prysm/v4/attacker"
-	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -245,15 +243,11 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 	}
 	client := attacker.GetAttacker()
 	if client != nil {
-		delayStr := os.Getenv("ATTACKER_BLOCK_BROADCAST_DELAY_TS")
-		if delayStr != "" {
-			delay, _ := strconv.Atoi(delayStr)
-			_, err = client.Delay(ctx, uint(delay))
-			if err != nil {
-				log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while block delaying")
-			} else {
-				log.WithField("attacker", "block_delay").Info("attacker succeed")
-			}
+		err = client.BlockBroadCastDelay(ctx)
+		if err != nil {
+			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while block delaying")
+		} else {
+			log.WithField("attacker", "block_delay").Info("attacker succeed")
 		}
 	}
 	if err := vs.P2P.Broadcast(ctx, blkPb); err != nil {
