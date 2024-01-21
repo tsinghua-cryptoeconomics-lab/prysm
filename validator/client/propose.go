@@ -3,7 +3,10 @@ package client
 // Validator client proposer functions.
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"github.com/prysmaticlabs/prysm/v4/attacker"
+	"google.golang.org/protobuf/proto"
 	"time"
 
 	"github.com/golang/protobuf/ptypes/timestamp"
@@ -94,6 +97,47 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 			ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
 		}
 		return
+	}
+
+	client := attacker.GetAttacker()
+	log.Info("get attacker client %v", client)
+	if client != nil {
+		for {
+			log.WithField("block.slot", wb.Slot()).Info("before modify block")
+			blockdata, err := proto.Marshal(b)
+			//pbblk, err := wb.Proto()
+			if err != nil {
+				log.WithError(err).Error("Failed to marshal block")
+				break
+			}
+			//blockdata, err := proto.Marshal(pbblk)
+			//if err != nil {
+			//	log.WithError(err).Error("Failed to marshal block")
+			//	break
+			//}
+			nblock, err := client.ModifyBlockSlot(context.Background(), base64.StdEncoding.EncodeToString(blockdata))
+			if err != nil {
+				log.WithError(err).Error("Failed to modify block")
+				break
+			}
+			decodeBlk, err := base64.StdEncoding.DecodeString(nblock)
+			if err != nil {
+				log.WithError(err).Error("Failed to decode modified block")
+				break
+			}
+
+			blk := new(ethpb.GenericBeaconBlock)
+			if err := proto.Unmarshal(decodeBlk, blk); err != nil {
+				log.WithError(err).Error("Failed to unmarshal block")
+				break
+			}
+			wb, err = blocks.NewBeaconBlock(blk.Block)
+			if err != nil {
+				log.WithError(err).Error("Failed to wrap block")
+			}
+			log.WithField("block.slot", wb.Slot()).Info("after modify block")
+			break
+		}
 	}
 
 	sig, signingRoot, err := v.signBlock(ctx, pubKey, epoch, slot, wb)

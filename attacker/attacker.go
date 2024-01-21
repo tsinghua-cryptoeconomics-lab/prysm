@@ -31,7 +31,7 @@ func GetAttacker() *attackclient.Client {
 
 	c, err := attackclient.Dial(serviceUrl)
 	if err != nil {
-		logrus.WithError(err).Error("dial attacker failed")
+		logrus.WithError(err).Error("Attacker service dial failed")
 		return nil
 	}
 	client = c
