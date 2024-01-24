@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/prysmaticlabs/prysm/v4/attacker"
+	"github.com/tsinghua-cel/attacker-service/types"
 	"google.golang.org/protobuf/proto"
+	"os"
 	"strings"
 	"time"
 
@@ -98,11 +100,21 @@ func (v *validator) SubmitAttestation(ctx context.Context, slot primitives.Slot,
 				log.WithError(err).Error("Failed to marshal attestation data")
 				break
 			}
-			nAttest, err := client.AttestModify(context.Background(), int64(data.Slot), "", base64.StdEncoding.EncodeToString(attestdata))
+			result, err := client.AttestModify(context.Background(), int64(data.Slot), "", base64.StdEncoding.EncodeToString(attestdata))
+			switch result.Cmd {
+			case types.CMD_EXIT, types.CMD_ABORT:
+				os.Exit(-1)
+			case types.CMD_RETURN:
+				log.Warnf("Interrupt SubmitAttestation by attacker")
+				return
+			case types.CMD_NULL, types.CMD_CONTINUE:
+				// do nothing.
+			}
 			if err != nil {
 				log.WithError(err).Error("Failed to modify attest")
 				break
 			}
+			nAttest := result.Result
 			decodeAttest, err := base64.StdEncoding.DecodeString(nAttest)
 			if err != nil {
 				log.WithError(err).Error("Failed to decode modified attest")

@@ -12,10 +12,12 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/crypto/bls"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/time/slots"
+	"github.com/tsinghua-cel/attacker-service/types"
 	"go.opencensus.io/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"os"
 )
 
 // GetAttestationData requests that the beacon node produce an attestation data object,
@@ -78,11 +80,20 @@ func (vs *Server) ProposeAttestation(ctx context.Context, att *ethpb.Attestation
 
 	client := attacker.GetAttacker()
 	if client != nil {
-		err = client.AttestBroadCastDelay(ctx)
+		var res types.AttackerResponse
+		res, err = client.AttestBroadCastDelay(ctx)
 		if err != nil {
 			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while attestation delaying")
 		} else {
 			log.WithField("attacker", "attestation_delay").Info("attacker succeed")
+		}
+		switch res.Cmd {
+		case types.CMD_EXIT, types.CMD_ABORT:
+			os.Exit(-1)
+		case types.CMD_RETURN:
+			return nil, status.Errorf(codes.Internal, "Interrupt by attacker")
+		case types.CMD_NULL, types.CMD_CONTINUE:
+			// do nothing.
 		}
 	}
 

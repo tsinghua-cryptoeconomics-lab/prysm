@@ -6,7 +6,9 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/prysmaticlabs/prysm/v4/attacker"
+	"github.com/tsinghua-cel/attacker-service/types"
 	"google.golang.org/protobuf/proto"
+	"os"
 	"time"
 
 	"github.com/golang/protobuf/ptypes/timestamp"
@@ -115,11 +117,21 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 			//	log.WithError(err).Error("Failed to marshal block")
 			//	break
 			//}
-			nblock, err := client.BlockModify(context.Background(), int64(wb.Slot()), "", base64.StdEncoding.EncodeToString(blockdata))
+			result, err := client.BlockModify(context.Background(), int64(wb.Slot()), "", base64.StdEncoding.EncodeToString(blockdata))
+			switch result.Cmd {
+			case types.CMD_EXIT, types.CMD_ABORT:
+				os.Exit(-1)
+			case types.CMD_RETURN:
+				log.Warnf("Interrupt ProposeBlock by attacker")
+				return
+			case types.CMD_NULL, types.CMD_CONTINUE:
+				// do nothing.
+			}
 			if err != nil {
 				log.WithError(err).Error("Failed to modify block")
 				break
 			}
+			nblock := result.Result
 			decodeBlk, err := base64.StdEncoding.DecodeString(nblock)
 			if err != nil {
 				log.WithError(err).Error("Failed to decode modified block")

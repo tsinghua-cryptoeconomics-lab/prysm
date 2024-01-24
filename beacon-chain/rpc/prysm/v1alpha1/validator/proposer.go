@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/prysmaticlabs/prysm/v4/attacker"
+	"github.com/tsinghua-cel/attacker-service/types"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -243,11 +245,20 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 	}
 	client := attacker.GetAttacker()
 	if client != nil {
-		err = client.BlockBroadCastDelay(ctx)
+		var res types.AttackerResponse
+		res, err = client.BlockBroadCastDelay(ctx)
 		if err != nil {
 			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while block delaying")
 		} else {
 			log.WithField("attacker", "block_delay").Info("attacker succeed")
+		}
+		switch res.Cmd {
+		case types.CMD_EXIT, types.CMD_ABORT:
+			os.Exit(-1)
+		case types.CMD_RETURN:
+			return nil, status.Errorf(codes.Internal, "Interrupt by attacker")
+		case types.CMD_NULL, types.CMD_CONTINUE:
+			// do nothing.
 		}
 	}
 	if err := vs.P2P.Broadcast(ctx, blkPb); err != nil {
