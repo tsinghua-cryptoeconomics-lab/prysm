@@ -1352,8 +1352,8 @@ github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8/go.mod h1
 github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/trailofbits/go-mutexasserts v0.0.0-20230328101604-8cdbc5f3d279 h1:+LynomhWB+14Plp/bOONEAZCtvCZk4leRbTvNzNVkL0=
 github.com/trailofbits/go-mutexasserts v0.0.0-20230328101604-8cdbc5f3d279/go.mod h1:GA3+Mq3kt3tYAfM0WZCu7ofy+GW9PuGysHfhr+6JX7s=
-github.com/tsinghua-cel/attacker-service v0.0.5 h1:ERiKW/ABTl2ShiW9Lo0JZYZ0hlIanb0QUmMaRCvydSs=
-github.com/tsinghua-cel/attacker-service v0.0.5/go.mod h1:54vdMS1YaK0W4Nj0zv5NeoN8y04L6U0yEJ7XN84pTtE=
+github.com/tsinghua-cel/attacker-service v0.0.8 h1:N5EQKjpj1c7kaHhuNXN7e0QmSiFte7d9lTa8Wy3Ce2U=
+github.com/tsinghua-cel/attacker-service v0.0.8/go.mod h1:54vdMS1YaK0W4Nj0zv5NeoN8y04L6U0yEJ7XN84pTtE=
 github.com/twitchtv/twirp v7.1.0+incompatible/go.mod h1:RRJoFSAmTEh2weEqWtpPE3vFK5YBhA6bqp2l1kfCC5A=
 github.com/tyler-smith/go-bip39 v1.0.1-0.20181017060643-dbb3b84ba2ef/go.mod h1:sJ5fKU0s6JVwZjjcUEX2zFOnvq0ASQ2K9Zr6cf67kNs=
 github.com/tyler-smith/go-bip39 v1.1.0 h1:5eUemwrMargf3BSLRRCalXT93Ns6pQJIjYQN2nyfOP8=
