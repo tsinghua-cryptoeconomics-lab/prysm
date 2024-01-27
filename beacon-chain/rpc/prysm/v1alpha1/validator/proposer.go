@@ -238,33 +238,6 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 		return nil, errors.Wrap(err, "could not unblind builder block")
 	}
 
-	// Broadcast the new block to the network.
-	blkPb, err := blk.Proto()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not get protobuf block")
-	}
-	client := attacker.GetAttacker()
-	if client != nil {
-		var res types.AttackerResponse
-		res, err = client.BlockBroadCastDelay(ctx)
-		if err != nil {
-			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while block delaying")
-		} else {
-			log.WithField("attacker", "block_delay").Info("attacker succeed")
-		}
-		switch res.Cmd {
-		case types.CMD_EXIT, types.CMD_ABORT:
-			os.Exit(-1)
-		case types.CMD_RETURN:
-			return nil, status.Errorf(codes.Internal, "Interrupt by attacker")
-		case types.CMD_NULL, types.CMD_CONTINUE:
-			// do nothing.
-		}
-	}
-	if err := vs.P2P.Broadcast(ctx, blkPb); err != nil {
-		return nil, fmt.Errorf("could not broadcast block: %v", err)
-	}
-
 	var scs []*ethpb.SignedBlobSidecar
 	if blk.Version() >= version.Deneb {
 		if blinded {
@@ -311,6 +284,57 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 		Type: blockfeed.ReceivedBlock,
 		Data: &blockfeed.ReceivedBlockData{SignedBlock: blk},
 	})
+
+	// Broadcast the new block to the network.
+	blkPb, err := blk.Proto()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get protobuf block")
+	}
+	client := attacker.GetAttacker()
+	skipBroad := false
+	if client != nil {
+		var res types.AttackerResponse
+		res, err = client.BlockBeforeBroadCast(ctx)
+		if err != nil {
+			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while block delaying")
+		} else {
+			log.WithField("attacker", "block_delay").Info("attacker succeed")
+		}
+		switch res.Cmd {
+		case types.CMD_EXIT, types.CMD_ABORT:
+			os.Exit(-1)
+		case types.CMD_SKIP:
+			skipBroad = true
+		case types.CMD_RETURN:
+			return nil, status.Errorf(codes.Internal, "Interrupt by attacker")
+		case types.CMD_NULL, types.CMD_CONTINUE:
+			// do nothing.
+		}
+	}
+	if !skipBroad {
+		if err := vs.P2P.Broadcast(ctx, blkPb); err != nil {
+			return nil, fmt.Errorf("could not broadcast block: %v", err)
+		}
+	}
+	if client != nil {
+		var res types.AttackerResponse
+		res, err = client.BlockAfterBroadCast(ctx)
+		if err != nil {
+			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while block delaying")
+		} else {
+			log.WithField("attacker", "block_delay").Info("attacker succeed")
+		}
+		switch res.Cmd {
+		case types.CMD_EXIT, types.CMD_ABORT:
+			os.Exit(-1)
+		case types.CMD_SKIP:
+			// just nothing to do.
+		case types.CMD_RETURN:
+			return nil, status.Errorf(codes.Internal, "Interrupt by attacker")
+		case types.CMD_NULL, types.CMD_CONTINUE:
+			// do nothing.
+		}
+	}
 
 	return &ethpb.ProposeResponse{
 		BlockRoot: root[:],

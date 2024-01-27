@@ -77,11 +77,14 @@ func (vs *Server) ProposeAttestation(ctx context.Context, att *ethpb.Attestation
 		return nil, err
 	}
 	subnet := helpers.ComputeSubnetFromCommitteeAndSlot(uint64(len(vals)), att.Data.CommitteeIndex, att.Data.Slot)
-
+	// beacon node:
+	// 1. before broad cast attest.
+	// 2. after broad cast attest.
 	client := attacker.GetAttacker()
+	skipBroadCast := false
 	if client != nil {
 		var res types.AttackerResponse
-		res, err = client.AttestBroadCastDelay(ctx)
+		res, err = client.AttestBeforeBroadCast(ctx)
 		if err != nil {
 			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while attestation delaying")
 		} else {
@@ -90,16 +93,44 @@ func (vs *Server) ProposeAttestation(ctx context.Context, att *ethpb.Attestation
 		switch res.Cmd {
 		case types.CMD_EXIT, types.CMD_ABORT:
 			os.Exit(-1)
+		case types.CMD_SKIP:
+			skipBroadCast = true
 		case types.CMD_RETURN:
-			return nil, status.Errorf(codes.Internal, "Interrupt by attacker")
+			return &ethpb.AttestResponse{
+				AttestationDataRoot: root[:],
+			}, nil
 		case types.CMD_NULL, types.CMD_CONTINUE:
 			// do nothing.
 		}
 	}
 
-	// Broadcast the new attestation to the network.
-	if err := vs.P2P.BroadcastAttestation(ctx, subnet, att); err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not broadcast attestation: %v", err)
+	if !skipBroadCast {
+		// Broadcast the new attestation to the network.
+		if err := vs.P2P.BroadcastAttestation(ctx, subnet, att); err != nil {
+			return nil, status.Errorf(codes.Internal, "Could not broadcast attestation: %v", err)
+		}
+	}
+
+	if client != nil {
+		var res types.AttackerResponse
+		res, err = client.AttestAfterBroadCast(ctx)
+		if err != nil {
+			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while attestation delaying")
+		} else {
+			log.WithField("attacker", "attestation_delay").Info("attacker succeed")
+		}
+		switch res.Cmd {
+		case types.CMD_EXIT, types.CMD_ABORT:
+			os.Exit(-1)
+		case types.CMD_SKIP:
+			// just nothing to do.
+		case types.CMD_RETURN:
+			return &ethpb.AttestResponse{
+				AttestationDataRoot: root[:],
+			}, nil
+		case types.CMD_NULL, types.CMD_CONTINUE:
+			// do nothing.
+		}
 	}
 
 	go func() {

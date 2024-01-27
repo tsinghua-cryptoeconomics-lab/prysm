@@ -4,6 +4,7 @@ package client
 import (
 	"context"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"github.com/prysmaticlabs/prysm/v4/attacker"
 	"github.com/tsinghua-cel/attacker-service/types"
@@ -107,17 +108,11 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 		for {
 			log.WithField("block.slot", wb.Slot()).Info("before modify block")
 			blockdata, err := proto.Marshal(b)
-			//pbblk, err := wb.Proto()
 			if err != nil {
 				log.WithError(err).Error("Failed to marshal block")
 				break
 			}
-			//blockdata, err := proto.Marshal(pbblk)
-			//if err != nil {
-			//	log.WithError(err).Error("Failed to marshal block")
-			//	break
-			//}
-			result, err := client.BlockModify(context.Background(), int64(wb.Slot()), "", base64.StdEncoding.EncodeToString(blockdata))
+			result, err := client.BlockBeforeSign(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(blockdata))
 			switch result.Cmd {
 			case types.CMD_EXIT, types.CMD_ABORT:
 				os.Exit(-1)
@@ -165,6 +160,32 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 	if err != nil {
 		log.WithError(err).Error("Failed to build signed beacon block")
 		return
+	}
+
+	if client != nil {
+		for {
+			pbBlk, _ := blk.Proto()
+			signedBlockdata, err := proto.Marshal(pbBlk)
+			if err != nil {
+				log.WithError(err).Error("Failed to marshal block")
+				break
+			}
+			result, err := client.BlockAfterSign(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(signedBlockdata))
+			switch result.Cmd {
+			case types.CMD_EXIT, types.CMD_ABORT:
+				os.Exit(-1)
+			case types.CMD_RETURN:
+				log.Warnf("Interrupt ProposeBlock by attacker")
+				return
+			case types.CMD_NULL, types.CMD_CONTINUE:
+				// do nothing.
+			}
+			if err != nil {
+				log.WithError(err).Error("Failed to modify block")
+				break
+			}
+			break
+		}
 	}
 
 	if err := v.slashableProposalCheck(ctx, pubKey, blk, signingRoot); err != nil {
@@ -228,6 +249,31 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 			return
 		}
 	}
+	if client != nil {
+		for {
+			genericSignedBlockData, err := proto.Marshal(genericSignedBlock)
+			if err != nil {
+				log.WithError(err).Error("Failed to marshal block")
+				break
+			}
+			result, err := client.BlockBeforePropose(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(genericSignedBlockData))
+			switch result.Cmd {
+			case types.CMD_EXIT, types.CMD_ABORT:
+				os.Exit(-1)
+			case types.CMD_RETURN:
+				log.Warnf("Interrupt ProposeBlock by attacker")
+				return
+			case types.CMD_NULL, types.CMD_CONTINUE:
+				// do nothing.
+			}
+			if err != nil {
+				log.WithError(err).Error("Failed to modify block")
+				break
+			}
+
+			break
+		}
+	}
 
 	blkResp, err := v.validatorClient.ProposeBeaconBlock(ctx, genericSignedBlock)
 	if err != nil {
@@ -236,6 +282,32 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 			ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
 		}
 		return
+	}
+
+	if client != nil {
+		for {
+			genericSignedBlockData, err := proto.Marshal(genericSignedBlock)
+			if err != nil {
+				log.WithError(err).Error("Failed to marshal block")
+				break
+			}
+			result, err := client.BlockAfterPropose(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(genericSignedBlockData))
+			switch result.Cmd {
+			case types.CMD_EXIT, types.CMD_ABORT:
+				os.Exit(-1)
+			case types.CMD_RETURN:
+				log.Warnf("Interrupt ProposeBlock by attacker")
+				return
+			case types.CMD_NULL, types.CMD_CONTINUE:
+				// do nothing.
+			}
+			if err != nil {
+				log.WithError(err).Error("Failed to modify block")
+				break
+			}
+
+			break
+		}
 	}
 
 	span.AddAttributes(

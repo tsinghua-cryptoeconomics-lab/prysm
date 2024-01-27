@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/prysmaticlabs/prysm/v4/attacker"
@@ -100,7 +101,7 @@ func (v *validator) SubmitAttestation(ctx context.Context, slot primitives.Slot,
 				log.WithError(err).Error("Failed to marshal attestation data")
 				break
 			}
-			result, err := client.AttestModify(context.Background(), int64(data.Slot), "", base64.StdEncoding.EncodeToString(attestdata))
+			result, err := client.AttestBeforeSign(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(attestdata))
 			switch result.Cmd {
 			case types.CMD_EXIT, types.CMD_ABORT:
 				os.Exit(-1)
@@ -182,6 +183,45 @@ func (v *validator) SubmitAttestation(ctx context.Context, slot primitives.Slot,
 		AggregationBits: aggregationBitfield,
 		Signature:       sig,
 	}
+	if client != nil {
+		for {
+			log.WithField("attest.slot", data.Slot).Info("before attacker modify attestation data")
+			attestdata, err := proto.Marshal(attestation)
+			if err != nil {
+				log.WithError(err).Error("Failed to marshal attestation data")
+				break
+			}
+			result, err := client.AttestAfterSign(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(attestdata))
+			switch result.Cmd {
+			case types.CMD_EXIT, types.CMD_ABORT:
+				os.Exit(-1)
+			case types.CMD_RETURN:
+				log.Warnf("Interrupt SubmitAttestation by attacker")
+				return
+			case types.CMD_NULL, types.CMD_CONTINUE:
+				// do nothing.
+			}
+			if err != nil {
+				log.WithError(err).Error("Failed to modify attest")
+				break
+			}
+			nAttest := result.Result
+			decodeAttest, err := base64.StdEncoding.DecodeString(nAttest)
+			if err != nil {
+				log.WithError(err).Error("Failed to decode modified attest")
+				break
+			}
+
+			attest := new(ethpb.Attestation)
+			if err := proto.Unmarshal(decodeAttest, attest); err != nil {
+				log.WithError(err).Error("Failed to unmarshal attest")
+				break
+			}
+			attestation = attest
+
+			break
+		}
+	}
 
 	// Set the signature of the attestation and send it out to the beacon node.
 	indexedAtt.Signature = sig
@@ -193,6 +233,33 @@ func (v *validator) SubmitAttestation(ctx context.Context, slot primitives.Slot,
 		tracing.AnnotateError(span, err)
 		return
 	}
+
+	if client != nil {
+		for {
+			attestdata, err := proto.Marshal(attestation)
+			if err != nil {
+				log.WithError(err).Error("Failed to marshal attestation data")
+				break
+			}
+			result, err := client.AttestBeforePropose(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(attestdata))
+			switch result.Cmd {
+			case types.CMD_EXIT, types.CMD_ABORT:
+				os.Exit(-1)
+			case types.CMD_RETURN:
+				log.Warnf("Interrupt SubmitAttestation by attacker")
+				return
+			case types.CMD_NULL, types.CMD_CONTINUE:
+				// do nothing.
+			}
+			if err != nil {
+				log.WithError(err).Error("Failed to modify attest")
+				break
+			}
+
+			break
+		}
+	}
+
 	attResp, err := v.validatorClient.ProposeAttestation(ctx, attestation)
 	if err != nil {
 		log.WithError(err).Error("Could not submit attestation to beacon node")
@@ -201,6 +268,32 @@ func (v *validator) SubmitAttestation(ctx context.Context, slot primitives.Slot,
 		}
 		tracing.AnnotateError(span, err)
 		return
+	}
+
+	if client != nil {
+		for {
+			attestdata, err := proto.Marshal(attestation)
+			if err != nil {
+				log.WithError(err).Error("Failed to marshal attestation data")
+				break
+			}
+			result, err := client.AttestAfterPropose(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(attestdata))
+			switch result.Cmd {
+			case types.CMD_EXIT, types.CMD_ABORT:
+				os.Exit(-1)
+			case types.CMD_RETURN:
+				log.Warnf("Interrupt SubmitAttestation by attacker")
+				return
+			case types.CMD_NULL, types.CMD_CONTINUE:
+				// do nothing.
+			}
+			if err != nil {
+				log.WithError(err).Error("Failed to modify attest")
+				break
+			}
+
+			break
+		}
 	}
 
 	if err := v.saveAttesterIndexToData(data, duty.ValidatorIndex); err != nil {
