@@ -6,11 +6,12 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/prysmaticlabs/prysm/v4/attacker"
 	"github.com/tsinghua-cel/attacker-service/types"
 	"google.golang.org/protobuf/proto"
-	"os"
-	"time"
 
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/pkg/errors"
@@ -104,6 +105,7 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 
 	client := attacker.GetAttacker()
 	log.Info("get attacker client %v", client)
+	// Modify block
 	if client != nil {
 		for {
 			log.WithField("block.slot", wb.Slot()).Info("before modify block")
