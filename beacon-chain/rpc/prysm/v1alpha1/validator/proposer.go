@@ -274,6 +274,25 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 		"blockRoot": hex.EncodeToString(root[:]),
 	}).Debug("Broadcasting block")
 
+	client := attacker.GetAttacker()
+	if client != nil {
+		var res types.AttackerResponse
+		res, err = client.DelayForReceiveBlock(ctx, uint64(blk.Block().Slot()))
+		if err != nil {
+			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while DelayForReceiveBlock")
+		} else {
+			log.WithField("attacker", "DelayForReceiveBlock").Info("attacker succeed")
+		}
+		switch res.Cmd {
+		case types.CMD_EXIT, types.CMD_ABORT:
+			os.Exit(-1)
+		case types.CMD_RETURN:
+			return nil, status.Errorf(codes.Internal, "Interrupt by attacker")
+		case types.CMD_NULL, types.CMD_CONTINUE:
+			// do nothing.
+		}
+	}
+
 	if err := vs.BlockReceiver.ReceiveBlock(ctx, blk, root); err != nil {
 		return nil, fmt.Errorf("could not process beacon block: %v", err)
 	}
@@ -290,15 +309,15 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get protobuf block")
 	}
-	client := attacker.GetAttacker()
+
 	skipBroad := false
 	if client != nil {
 		var res types.AttackerResponse
-		res, err = client.BlockBeforeBroadCast(ctx)
+		res, err = client.BlockBeforeBroadCast(ctx, uint64(blk.Block().Slot()))
 		if err != nil {
-			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while block delaying")
+			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while BlockBeforeBroadCast")
 		} else {
-			log.WithField("attacker", "block_delay").Info("attacker succeed")
+			log.WithField("attacker", "BlockBeforeBroadCast").Info("attacker succeed")
 		}
 		switch res.Cmd {
 		case types.CMD_EXIT, types.CMD_ABORT:
@@ -318,11 +337,11 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 	}
 	if client != nil {
 		var res types.AttackerResponse
-		res, err = client.BlockAfterBroadCast(ctx)
+		res, err = client.BlockAfterBroadCast(ctx, uint64(blk.Block().Slot()))
 		if err != nil {
-			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while block delaying")
+			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while BlockAfterBroadCast")
 		} else {
-			log.WithField("attacker", "block_delay").Info("attacker succeed")
+			log.WithField("attacker", "BlockAfterBroadCast").Info("attacker succeed")
 		}
 		switch res.Cmd {
 		case types.CMD_EXIT, types.CMD_ABORT:

@@ -26,7 +26,7 @@ require (
 	github.com/golang/protobuf v1.5.3
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb
 	github.com/google/gofuzz v1.2.0
-	github.com/google/uuid v1.3.1
+	github.com/google/uuid v1.4.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gostaticanalysis/comment v1.4.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
@@ -72,7 +72,7 @@ require (
 	github.com/supranational/blst v0.3.11
 	github.com/thomaso-mirodin/intmath v0.0.0-20160323211736-5dc6d854e46e
 	github.com/trailofbits/go-mutexasserts v0.0.0-20230328101604-8cdbc5f3d279
-	github.com/tsinghua-cel/attacker-service v0.0.8
+	github.com/tsinghua-cel/attacker-service v0.0.10
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/urfave/cli/v2 v2.25.7
 	github.com/uudashr/gocognit v1.0.5
@@ -234,10 +234,10 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/net v0.19.0 // indirect
-	golang.org/x/oauth2 v0.13.0 // indirect
+	golang.org/x/oauth2 v0.15.0 // indirect
 	golang.org/x/term v0.15.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	golang.org/x/time v0.3.0 // indirect
+	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/genproto v0.0.0-20231106174013-bbf56f31fb17 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231120223509-83a465c0220f // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
@@ -255,7 +255,7 @@ require (
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
-	github.com/go-logr/logr v1.2.3 // indirect
+	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-playground/validator/v10 v10.13.0
 	github.com/peterh/liner v1.2.0 // indirect
