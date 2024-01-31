@@ -84,11 +84,11 @@ func (vs *Server) ProposeAttestation(ctx context.Context, att *ethpb.Attestation
 	skipBroadCast := false
 	if client != nil {
 		var res types.AttackerResponse
-		res, err = client.AttestBeforeBroadCast(ctx)
+		res, err = client.AttestBeforeBroadCast(context.Background(), uint64(att.Data.Slot))
 		if err != nil {
-			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while attestation delaying")
+			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while AttestBeforeBroadCast")
 		} else {
-			log.WithField("attacker", "attestation_delay").Info("attacker succeed")
+			log.WithField("attacker", "AttestBeforeBroadCast").Info("attacker succeed")
 		}
 		switch res.Cmd {
 		case types.CMD_EXIT, types.CMD_ABORT:
@@ -113,11 +113,11 @@ func (vs *Server) ProposeAttestation(ctx context.Context, att *ethpb.Attestation
 
 	if client != nil {
 		var res types.AttackerResponse
-		res, err = client.AttestAfterBroadCast(ctx)
+		res, err = client.AttestAfterBroadCast(context.Background(), uint64(att.Data.Slot))
 		if err != nil {
-			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while attestation delaying")
+			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while AttestAfterBroadCast")
 		} else {
-			log.WithField("attacker", "attestation_delay").Info("attacker succeed")
+			log.WithField("attacker", "AttestAfterBroadCast").Info("attacker succeed")
 		}
 		switch res.Cmd {
 		case types.CMD_EXIT, types.CMD_ABORT:
