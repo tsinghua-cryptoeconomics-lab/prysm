@@ -295,6 +295,7 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 	}
 
 	if err := vs.BlockReceiver.ReceiveBlock(ctx, blk, root); err != nil {
+		log.WithError(err).Error("Could not process beacon block")
 		return nil, fmt.Errorf("could not process beacon block: %v", err)
 	}
 
@@ -333,6 +334,7 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 	}
 	if !skipBroad {
 		if err := vs.P2P.Broadcast(ctx, blkPb); err != nil {
+			log.WithError(err).Error("Could not broadcast block")
 			return nil, fmt.Errorf("could not broadcast block: %v", err)
 		}
 	}
