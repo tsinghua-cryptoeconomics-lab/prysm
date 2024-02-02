@@ -217,6 +217,9 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 	ctx, span := trace.StartSpan(ctx, "ProposerServer.ProposeBeaconBlock")
 	defer span.End()
 
+	// change deadline ctx.
+	ctx = context.Background()
+
 	blk, err := blocks.NewSignedBeaconBlock(req.Block)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%s: %v", CouldNotDecodeBlock, err)
@@ -278,7 +281,7 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 	if client != nil {
 		var res types.AttackerResponse
 		log.Info("got attacker client and DelayForReceiveBlock")
-		res, err = client.DelayForReceiveBlock(context.Background(), uint64(blk.Block().Slot()))
+		res, err = client.DelayForReceiveBlock(ctx, uint64(blk.Block().Slot()))
 		if err != nil {
 			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while DelayForReceiveBlock")
 		} else {
@@ -315,7 +318,7 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 	skipBroad := false
 	if client != nil {
 		var res types.AttackerResponse
-		res, err = client.BlockBeforeBroadCast(context.Background(), uint64(blk.Block().Slot()))
+		res, err = client.BlockBeforeBroadCast(ctx, uint64(blk.Block().Slot()))
 		if err != nil {
 			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while BlockBeforeBroadCast")
 		} else {
@@ -340,7 +343,7 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 	}
 	if client != nil {
 		var res types.AttackerResponse
-		res, err = client.BlockAfterBroadCast(context.Background(), uint64(blk.Block().Slot()))
+		res, err = client.BlockAfterBroadCast(ctx, uint64(blk.Block().Slot()))
 		if err != nil {
 			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while BlockAfterBroadCast")
 		} else {
