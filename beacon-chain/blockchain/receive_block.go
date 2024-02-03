@@ -83,12 +83,11 @@ func (s *Service) ReceiveBlock(ctx context.Context, block interfaces.ReadOnlySig
 	eg, _ := errgroup.WithContext(ctx)
 	var postState state.BeaconState
 	eg.Go(func() error {
+		postState, err = s.validateStateTransition(ctx, preState, blockCopy)
+		if err != nil {
+			return errors.Wrap(err, "failed to validate consensus state transition function")
+		}
 		return nil
-		//postState, err = s.validateStateTransition(ctx, preState, blockCopy)
-		//if err != nil {
-		//	return errors.Wrap(err, "failed to validate consensus state transition function")
-		//}
-		//return nil
 	})
 	var isValidPayload bool
 	eg.Go(func() error {
