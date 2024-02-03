@@ -3,6 +3,7 @@ package validator
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"github.com/prysmaticlabs/prysm/v4/attacker"
 	"github.com/tsinghua-cel/attacker-service/types"
@@ -276,6 +277,17 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 	log.WithFields(logrus.Fields{
 		"blockRoot": hex.EncodeToString(root[:]),
 	}).Debug("Broadcasting block")
+	originBlk, err := blk.PbCapellaBlock()
+	if err != nil {
+		log.WithError(err).Error("got orign PbCapellaBlock failed")
+	} else {
+		data, err := json.Marshal(originBlk)
+		if err != nil {
+			log.WithError(err).Error("got json.Marshal failed")
+		} else {
+			os.WriteFile(fmt.Sprintf("/root/beacondata/block-%d.json", blk.Block().Slot()), data, 0644)
+		}
+	}
 
 	client := attacker.GetAttacker()
 	if client != nil {
