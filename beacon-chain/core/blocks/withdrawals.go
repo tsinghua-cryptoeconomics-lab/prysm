@@ -50,6 +50,29 @@ func ProcessBLSToExecutionChanges(
 	return st, nil
 }
 
+func ProcessBLSToExecutionChangesNormal(
+	st state.BeaconState,
+	signed interfaces.ReadOnlyBeaconBlock) (state.BeaconState, error) {
+	if signed.Version() < version.Capella {
+		return st, nil
+	}
+	changes, err := signed.Body().BLSToExecutionChanges()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get BLSToExecutionChanges")
+	}
+	// Return early if no changes
+	if len(changes) == 0 {
+		return st, nil
+	}
+	for _, change := range changes {
+		st, err = processBLSToExecutionChange(st, change)
+		if err != nil {
+			return nil, errors.Wrap(err, "could not process BLSToExecutionChange")
+		}
+	}
+	return st, nil
+}
+
 // processBLSToExecutionChange validates a SignedBLSToExecution message and
 // changes the validator's withdrawal address accordingly.
 //

@@ -38,6 +38,7 @@ type BlockReceiver interface {
 	RecentBlockSlot(root [32]byte) (primitives.Slot, error)
 	BlockBeingSynced([32]byte) bool
 	CalculateStateRoot(ctx context.Context, block interfaces.ReadOnlySignedBeaconBlock) ([]byte, error)
+	CalculateStateRootNormal(ctx context.Context, block interfaces.ReadOnlyBeaconBlock) ([]byte, error)
 }
 
 // BlobReceiver interface defines the methods of chain service for receiving new
@@ -193,6 +194,22 @@ func (s *Service) CalculateStateRoot(ctx context.Context, block interfaces.ReadO
 		return nil, errors.Wrap(err, "could not get block's prestate")
 	}
 	newState, err := transition.CalculateStateRoot(ctx, preState, blockCopy)
+	if err != nil {
+		log.WithError(err).Error("Could not calculate state root")
+	}
+	return newState[:], nil
+}
+
+func (s *Service) CalculateStateRootNormal(ctx context.Context, block interfaces.ReadOnlyBeaconBlock) ([]byte, error) {
+	blockCopy, err := block.Copy()
+	if err != nil {
+		return nil, err
+	}
+	preState, err := s.getBlockPreState(ctx, blockCopy)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get block's prestate")
+	}
+	newState, err := transition.CalculateStateRootNormal(ctx, preState, blockCopy)
 	if err != nil {
 		log.WithError(err).Error("Could not calculate state root")
 	}

@@ -42,6 +42,24 @@ func ProcessAttestationsNoVerifySignature(
 	}
 	return beaconState, nil
 }
+func ProcessAttestationsNoVerifySignatureNormal(
+	ctx context.Context,
+	beaconState state.BeaconState,
+	b interfaces.ReadOnlyBeaconBlock,
+) (state.BeaconState, error) {
+	body := b.Body()
+	totalBalance, err := helpers.TotalActiveBalance(beaconState)
+	if err != nil {
+		return nil, err
+	}
+	for idx, att := range body.Attestations() {
+		beaconState, err = ProcessAttestationNoVerifySignature(ctx, beaconState, att, totalBalance)
+		if err != nil {
+			return nil, errors.Wrapf(err, "could not verify attestation at index %d in block", idx)
+		}
+	}
+	return beaconState, nil
+}
 
 // ProcessAttestationNoVerifySignature processes the attestation without verifying the attestation signature. This
 // method is used to validate attestations whose signatures have already been verified or will be verified later.

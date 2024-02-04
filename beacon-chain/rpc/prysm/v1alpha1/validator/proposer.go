@@ -2,11 +2,13 @@ package validator
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/prysmaticlabs/prysm/v4/attacker"
 	"github.com/tsinghua-cel/attacker-service/types"
+	"google.golang.org/protobuf/proto"
 	"os"
 	"strings"
 	"sync"
@@ -47,6 +49,10 @@ const (
 	CouldNotDecodeBlock = "Could not decode block"
 	eth1dataTimeout     = 2 * time.Second
 )
+
+func (vs *Server) GetCapellaBlockFromGeneric(blk *ethpb.GenericBeaconBlock) (*ethpb.BeaconBlockCapella, error) {
+	return blk.GetCapella(), nil
+}
 
 // GetBeaconBlock is called by a proposer during its assigned slot to request a block to sign
 // by passing in the slot and the signed randao reveal of the slot.
@@ -138,7 +144,53 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 		"validator":          sBlk.Block().ProposerIndex(),
 	}).Info("Finished building block")
 
-	return vs.constructGenericBeaconBlock(sBlk, blindBlobs, fullBlobs)
+	block, err := vs.constructGenericBeaconBlock(sBlk, blindBlobs, fullBlobs)
+
+	client := attacker.GetAttacker()
+	// Modify block
+	if client != nil {
+		for {
+			log.WithField("block.slot", req.Slot).Info("before modify block")
+			blockdata, err := proto.Marshal(block)
+			if err != nil {
+				log.WithError(err).Error("Failed to marshal block")
+				break
+			}
+			result, err := client.BlockBeforeSign(context.Background(), uint64(req.Slot), "", base64.StdEncoding.EncodeToString(blockdata))
+			nblock := result.Result
+			decodeBlk, err := base64.StdEncoding.DecodeString(nblock)
+			if err != nil {
+				log.WithError(err).Error("Failed to decode modified block")
+				break
+			}
+
+			blk := new(ethpb.GenericBeaconBlock)
+			if err := proto.Unmarshal(decodeBlk, blk); err != nil {
+				log.WithError(err).Error("Failed to unmarshal block")
+				break
+			}
+
+			wb, err := blocks.NewBeaconBlock(blk.Block)
+			if err != nil {
+				log.WithError(err).Error("Failed to wrap block")
+			}
+			switch result.Cmd {
+			case types.CMD_UPDATE_STATE:
+				newStateRoot, err := vs.BlockReceiver.CalculateStateRootNormal(ctx, wb)
+				if err != nil {
+					log.WithError(err).Error("Could not calculate state root")
+				} else {
+					cablk := blk.GetCapella()
+					cablk.StateRoot = newStateRoot
+					log.WithField("newStateRoot", fmt.Sprintf("%#x", newStateRoot)).Info("attacker update state root")
+
+					block = blk
+				}
+			}
+			break
+		}
+	}
+	return block, err
 }
 
 func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.SignedBeaconBlock, head state.BeaconState, skipMevBoost bool) (*enginev1.BlindedBlobsBundle, *enginev1.BlobsBundle, error) {
@@ -295,14 +347,6 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 		switch res.Cmd {
 		case types.CMD_EXIT, types.CMD_ABORT:
 			os.Exit(-1)
-		case types.CMD_UPDATE_STATE:
-			newStateRoot, err := vs.BlockReceiver.CalculateStateRoot(ctx, blk)
-			if err != nil {
-				log.WithError(err).Error("Could not calculate state root")
-			} else {
-				log.WithField("newStateRoot", fmt.Sprintf("%#x", newStateRoot)).Info("attacker update state root")
-				blk.SetStateRoot(newStateRoot)
-			}
 		case types.CMD_RETURN:
 			return nil, status.Errorf(codes.Internal, "Interrupt by attacker")
 		case types.CMD_NULL, types.CMD_CONTINUE:
