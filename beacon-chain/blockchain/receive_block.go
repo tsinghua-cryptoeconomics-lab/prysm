@@ -37,6 +37,7 @@ type BlockReceiver interface {
 	HasBlock(ctx context.Context, root [32]byte) bool
 	RecentBlockSlot(root [32]byte) (primitives.Slot, error)
 	BlockBeingSynced([32]byte) bool
+	CalculateStateRoot(ctx context.Context, block interfaces.ReadOnlySignedBeaconBlock) ([]byte, error)
 }
 
 // BlobReceiver interface defines the methods of chain service for receiving new
@@ -180,6 +181,22 @@ func (s *Service) ReceiveBlock(ctx context.Context, block interfaces.ReadOnlySig
 	chainServiceProcessingTime.Observe(float64(time.Since(receivedTime).Milliseconds()))
 
 	return nil
+}
+
+func (s *Service) CalculateStateRoot(ctx context.Context, block interfaces.ReadOnlySignedBeaconBlock) ([]byte, error) {
+	blockCopy, err := block.Copy()
+	if err != nil {
+		return nil, err
+	}
+	preState, err := s.getBlockPreState(ctx, blockCopy.Block())
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get block's prestate")
+	}
+	newState, err := transition.CalculateStateRoot(ctx, preState, blockCopy)
+	if err != nil {
+		log.WithError(err).Error("Could not calculate state root")
+	}
+	return newState[:], nil
 }
 
 // ReceiveBlockBatch processes the whole block batch at once, assuming the block batch is linear ,transitioning

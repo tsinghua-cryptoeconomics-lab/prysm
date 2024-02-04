@@ -1,6 +1,7 @@
 package transition
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -73,15 +74,15 @@ func ExecuteStateTransitionNoVerifyAnySig(
 	}
 
 	// State root validation.
-	//postStateRoot, err := st.HashTreeRoot(ctx)
-	//if err != nil {
-	//	return nil, nil, err
-	//}
-	//stateRoot := signed.Block().StateRoot()
-	//if !bytes.Equal(postStateRoot[:], stateRoot[:]) {
-	//	return nil, nil, fmt.Errorf("could not validate state root, wanted: %#x, received: %#x",
-	//		postStateRoot[:], signed.Block().StateRoot())
-	//}
+	postStateRoot, err := st.HashTreeRoot(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	stateRoot := signed.Block().StateRoot()
+	if !bytes.Equal(postStateRoot[:], stateRoot[:]) {
+		return nil, nil, fmt.Errorf("could not validate state root, wanted: %#x, received: %#x",
+			postStateRoot[:], signed.Block().StateRoot())
+	}
 
 	return set, st, nil
 }

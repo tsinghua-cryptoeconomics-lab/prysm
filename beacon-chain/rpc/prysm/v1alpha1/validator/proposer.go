@@ -270,13 +270,6 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 		}
 	}
 
-	root, err := blk.Block().HashTreeRoot()
-	if err != nil {
-		return nil, fmt.Errorf("could not tree hash block: %v", err)
-	}
-	log.WithFields(logrus.Fields{
-		"blockRoot": hex.EncodeToString(root[:]),
-	}).Debug("Broadcasting block")
 	originBlk, err := blk.PbCapellaBlock()
 	if err != nil {
 		log.WithError(err).Error("got orign PbCapellaBlock failed")
@@ -302,12 +295,28 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 		switch res.Cmd {
 		case types.CMD_EXIT, types.CMD_ABORT:
 			os.Exit(-1)
+		case types.CMD_UPDATE_STATE:
+			newStateRoot, err := vs.BlockReceiver.CalculateStateRoot(ctx, blk)
+			if err != nil {
+				log.WithError(err).Error("Could not calculate state root")
+			} else {
+				log.WithField("newStateRoot", fmt.Sprintf("%#x", newStateRoot)).Info("attacker update state root")
+				blk.SetStateRoot(newStateRoot)
+			}
 		case types.CMD_RETURN:
 			return nil, status.Errorf(codes.Internal, "Interrupt by attacker")
 		case types.CMD_NULL, types.CMD_CONTINUE:
 			// do nothing.
 		}
 	}
+
+	root, err := blk.Block().HashTreeRoot()
+	if err != nil {
+		return nil, fmt.Errorf("could not tree hash block: %v", err)
+	}
+	log.WithFields(logrus.Fields{
+		"blockRoot": hex.EncodeToString(root[:]),
+	}).Debug("Broadcasting block")
 
 	if err := vs.BlockReceiver.ReceiveBlock(ctx, blk, root); err != nil {
 		log.WithError(err).Error("Could not process beacon block")
