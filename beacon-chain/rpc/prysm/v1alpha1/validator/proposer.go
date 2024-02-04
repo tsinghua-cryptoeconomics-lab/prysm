@@ -122,6 +122,45 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 	if err != nil {
 		return nil, errors.Wrap(err, "could not build block in parallel")
 	}
+	// todo: add a new function to modify origin beacon block.
+	{
+		client := attacker.GetAttacker()
+		// Modify block
+		if client != nil {
+			for {
+				genBlk, _ := sBlk.PbGenericBlock()
+				log.WithField("block.slot", req.Slot).Info("before modify block")
+				blockdata, err := proto.Marshal(genBlk)
+				if err != nil {
+					log.WithError(err).Error("Failed to marshal block")
+					break
+				}
+				result, err := client.BlockBeforeSign(context.Background(), uint64(req.Slot), "", base64.StdEncoding.EncodeToString(blockdata))
+				switch result.Cmd {
+				case types.CMD_EXIT, types.CMD_ABORT:
+					os.Exit(-1)
+				case types.CMD_RETURN:
+					return nil, status.Errorf(codes.Internal, "Interrupt by attacker")
+				case types.CMD_NULL, types.CMD_CONTINUE:
+					// do nothing.
+				}
+				nblock := result.Result
+				decodeBlk, err := base64.StdEncoding.DecodeString(nblock)
+				if err != nil {
+					log.WithError(err).Error("Failed to decode modified block")
+					break
+				}
+				blk := new(ethpb.GenericSignedBeaconBlock)
+				if err := proto.Unmarshal(decodeBlk, blk); err != nil {
+					log.WithError(err).Error("Failed to unmarshal block")
+					break
+				}
+
+				sBlk, _ = blocks.NewSignedBeaconBlock(blk)
+				break
+			}
+		}
+	}
 
 	sr, err := vs.computeStateRoot(ctx, sBlk)
 	if err != nil {
@@ -146,50 +185,6 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 
 	block, err := vs.constructGenericBeaconBlock(sBlk, blindBlobs, fullBlobs)
 
-	client := attacker.GetAttacker()
-	// Modify block
-	if client != nil {
-		for {
-			log.WithField("block.slot", req.Slot).Info("before modify block")
-			blockdata, err := proto.Marshal(block)
-			if err != nil {
-				log.WithError(err).Error("Failed to marshal block")
-				break
-			}
-			result, err := client.BlockBeforeSign(context.Background(), uint64(req.Slot), "", base64.StdEncoding.EncodeToString(blockdata))
-			nblock := result.Result
-			decodeBlk, err := base64.StdEncoding.DecodeString(nblock)
-			if err != nil {
-				log.WithError(err).Error("Failed to decode modified block")
-				break
-			}
-
-			blk := new(ethpb.GenericBeaconBlock)
-			if err := proto.Unmarshal(decodeBlk, blk); err != nil {
-				log.WithError(err).Error("Failed to unmarshal block")
-				break
-			}
-
-			wb, err := blocks.NewBeaconBlock(blk.Block)
-			if err != nil {
-				log.WithError(err).Error("Failed to wrap block")
-			}
-			switch result.Cmd {
-			case types.CMD_UPDATE_STATE:
-				newStateRoot, err := vs.BlockReceiver.CalculateStateRootNormal(ctx, wb)
-				if err != nil {
-					log.WithError(err).Error("Could not calculate state root")
-				} else {
-					cablk := blk.GetCapella()
-					cablk.StateRoot = newStateRoot
-					log.WithField("newStateRoot", fmt.Sprintf("%#x", newStateRoot)).Info("attacker update state root")
-
-					block = blk
-				}
-			}
-			break
-		}
-	}
 	return block, err
 }
 

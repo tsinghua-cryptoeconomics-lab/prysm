@@ -6,10 +6,10 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"github.com/prysmaticlabs/prysm/v4/attacker"
 	"os"
 	"time"
 
-	"github.com/prysmaticlabs/prysm/v4/attacker"
 	"github.com/tsinghua-cel/attacker-service/types"
 	"google.golang.org/protobuf/proto"
 
@@ -103,52 +103,6 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 		return
 	}
 
-	client := attacker.GetAttacker()
-	log.Info("get attacker client %v", client)
-	// Modify block
-	if client != nil {
-		for {
-			//log.WithField("block.slot", wb.Slot()).Info("before modify block")
-			//blockdata, err := proto.Marshal(b)
-			//if err != nil {
-			//	log.WithError(err).Error("Failed to marshal block")
-			//	break
-			//}
-			//result, err := client.BlockBeforeSign(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(blockdata))
-			//switch result.Cmd {
-			//case types.CMD_EXIT, types.CMD_ABORT:
-			//	os.Exit(-1)
-			//case types.CMD_RETURN:
-			//	log.Warnf("Interrupt ProposeBlock by attacker")
-			//	return
-			//case types.CMD_NULL, types.CMD_CONTINUE:
-			//	// do nothing.
-			//}
-			//if err != nil {
-			//	log.WithError(err).Error("Failed to modify block")
-			//	break
-			//}
-			//nblock := result.Result
-			//decodeBlk, err := base64.StdEncoding.DecodeString(nblock)
-			//if err != nil {
-			//	log.WithError(err).Error("Failed to decode modified block")
-			//	break
-			//}
-			//
-			//blk := new(ethpb.GenericBeaconBlock)
-			//if err := proto.Unmarshal(decodeBlk, blk); err != nil {
-			//	log.WithError(err).Error("Failed to unmarshal block")
-			//	break
-			//}
-			//wb, err = blocks.NewBeaconBlock(blk.Block)
-			//if err != nil {
-			//	log.WithError(err).Error("Failed to wrap block")
-			//}
-			//log.WithField("block.slot", wb.Slot()).Info("after modify block")
-			break
-		}
-	}
-
 	sig, signingRoot, err := v.signBlock(ctx, pubKey, epoch, slot, wb)
 	if err != nil {
 		log.WithError(err).Error("Failed to sign block")
@@ -163,7 +117,7 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 		log.WithError(err).Error("Failed to build signed beacon block")
 		return
 	}
-
+	client := attacker.GetAttacker()
 	if client != nil {
 		for {
 			pbBlk, _ := blk.Proto()
