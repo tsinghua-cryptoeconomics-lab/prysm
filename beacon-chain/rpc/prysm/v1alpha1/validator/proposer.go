@@ -156,9 +156,10 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 					break
 				}
 
-				sBlk, err = blocks.NewSignedBeaconBlock(blk)
-				if err != nil {
+				if signedBlk, err := blocks.NewSignedBeaconBlock(blk); err != nil {
 					log.WithError(err).Error("failed to new signed beacon block from modify")
+				} else {
+					sBlk = signedBlk
 				}
 				break
 			}
