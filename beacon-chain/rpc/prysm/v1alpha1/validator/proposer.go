@@ -129,6 +129,10 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not get head state: %v", err)
 	}
+	log.WithFields(logrus.Fields{
+		"parentRoot": hex.EncodeToString(parentRoot[:]),
+		"slot":       req.Slot,
+	}).Info("go to ProcessSlotsUsingNextSlotCache")
 	head, err = transition.ProcessSlotsUsingNextSlotCache(ctx, head, parentRoot[:], req.Slot)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not process slots up to %d: %v", req.Slot, err)
