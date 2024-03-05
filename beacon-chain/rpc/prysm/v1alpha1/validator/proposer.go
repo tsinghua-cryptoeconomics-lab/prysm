@@ -353,7 +353,7 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 	}
 
 	blkInfo := struct {
-		BlockRoot [32]byte                        `json:"block-root"`
+		BlockRoot string                          `json:"block-root"`
 		BlockInfo *ethpb.SignedBeaconBlockCapella `json:"block-info"`
 	}{}
 
@@ -362,7 +362,8 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 		log.WithError(err).Error("got orign PbCapellaBlock failed")
 	} else {
 		blkInfo.BlockInfo = originBlk
-		blkInfo.BlockRoot, _ = originBlk.HashTreeRoot()
+		root, _ := originBlk.HashTreeRoot()
+		blkInfo.BlockRoot = base64.StdEncoding.EncodeToString(root[:])
 
 		data, err := json.Marshal(blkInfo)
 		if err != nil {
