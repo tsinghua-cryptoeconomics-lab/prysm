@@ -106,6 +106,7 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 					copy(parentRoot[:], newParentRoot)
 					log.WithField("parentRoot", result.Result).Info("update block new parent root")
 				}
+				break
 			}
 		}
 	}
