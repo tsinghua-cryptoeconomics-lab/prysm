@@ -5,7 +5,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/prysmaticlabs/prysm/v4/attacker"
+	"github.com/prysmaticlabs/prysm/v5/attacker"
 	"os"
 	"path/filepath"
 	runtimeDebug "runtime/debug"
