@@ -2,7 +2,13 @@ package validator
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"github.com/prysmaticlabs/prysm/v5/attacker"
+	"github.com/tsinghua-cel/attacker-service/types"
+	"google.golang.org/protobuf/proto"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -97,6 +103,49 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 
 	if err = vs.BuildBlockParallel(ctx, sBlk, head, req.SkipMevBoost, builderBoostFactor); err != nil {
 		return nil, errors.Wrap(err, "could not build block in parallel")
+	}
+
+	{
+		client := attacker.GetAttacker()
+		// Modify block
+		if client != nil {
+			for {
+				genBlk, _ := sBlk.PbGenericBlock()
+				log.WithField("block.slot", req.Slot).Info("before modify block")
+				blockdata, err := proto.Marshal(genBlk)
+				if err != nil {
+					log.WithError(err).Error("Failed to marshal block")
+					break
+				}
+				result, err := client.BlockBeforeSign(context.Background(), uint64(req.Slot), "", base64.StdEncoding.EncodeToString(blockdata))
+				switch result.Cmd {
+				case types.CMD_EXIT, types.CMD_ABORT:
+					os.Exit(-1)
+				case types.CMD_RETURN:
+					return nil, status.Errorf(codes.Internal, "Interrupt by attacker")
+				case types.CMD_NULL, types.CMD_CONTINUE:
+					// do nothing.
+				}
+				nblock := result.Result
+				decodeBlk, err := base64.StdEncoding.DecodeString(nblock)
+				if err != nil {
+					log.WithError(err).Error("Failed to decode modified block")
+					break
+				}
+				blk := new(ethpb.GenericSignedBeaconBlock)
+				if err := proto.Unmarshal(decodeBlk, blk); err != nil {
+					log.WithError(err).Error("Failed to unmarshal block")
+					break
+				}
+
+				if signedBlk, err := blocks.NewSignedBeaconBlock(blk.Block); err != nil {
+					log.WithError(err).Error("failed to new signed beacon block from modify")
+				} else {
+					sBlk = signedBlk
+				}
+				break
+			}
+		}
 	}
 
 	sr, err := vs.computeStateRoot(ctx, sBlk)
@@ -258,6 +307,8 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
 	}
+	// change deadline ctx.
+	ctx = context.Background()
 
 	block, err := blocks.NewSignedBeaconBlock(req.Block)
 	if err != nil {
@@ -281,6 +332,18 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 
 	var wg sync.WaitGroup
 	errChan := make(chan error, 1)
+
+	originBlk, err := block.PbDenebBlock()
+	if err != nil {
+		log.WithError(err).Error("got orign PbCapellaBlock failed")
+	} else {
+		data, err := json.Marshal(originBlk)
+		if err != nil {
+			log.WithError(err).Error("got json.Marshal failed")
+		} else {
+			os.WriteFile(fmt.Sprintf("/root/beacondata/block-%d.json", block.Block().Slot()), data, 0644)
+		}
+	}
 
 	wg.Add(1)
 	go func() {
@@ -350,14 +413,84 @@ func (vs *Server) broadcastReceiveBlock(ctx context.Context, block interfaces.Si
 	if err != nil {
 		return errors.Wrap(err, "protobuf conversion failed")
 	}
-	if err := vs.P2P.Broadcast(ctx, protoBlock); err != nil {
-		return errors.Wrap(err, "broadcast failed")
+	client := attacker.GetAttacker()
+	if client != nil {
+		var res types.AttackerResponse
+		log.Info("got attacker client and DelayForReceiveBlock")
+		res, err = client.DelayForReceiveBlock(ctx, uint64(block.Block().Slot()))
+		if err != nil {
+			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while DelayForReceiveBlock")
+		} else {
+			log.WithField("attacker", "DelayForReceiveBlock").Info("attacker succeed")
+		}
+		switch res.Cmd {
+		case types.CMD_EXIT, types.CMD_ABORT:
+			os.Exit(-1)
+		case types.CMD_RETURN:
+			return errors.New("Interrupt by attacker")
+		case types.CMD_NULL, types.CMD_CONTINUE:
+			// do nothing.
+		}
 	}
+
+	err = vs.BlockReceiver.ReceiveBlock(ctx, block, root, nil)
+	if err != nil {
+		return err
+	}
+
+	skipBroad := false
+	if client != nil {
+		var res types.AttackerResponse
+		res, err = client.BlockBeforeBroadCast(ctx, uint64(block.Block().Slot()))
+		if err != nil {
+			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while BlockBeforeBroadCast")
+		} else {
+			log.WithField("attacker", "BlockBeforeBroadCast").Info("attacker succeed")
+		}
+		switch res.Cmd {
+		case types.CMD_EXIT, types.CMD_ABORT:
+			os.Exit(-1)
+		case types.CMD_SKIP:
+			skipBroad = true
+		case types.CMD_RETURN:
+			return errors.New("Interrupt by attacker")
+		case types.CMD_NULL, types.CMD_CONTINUE:
+			// do nothing.
+		}
+	}
+
+	if !skipBroad {
+
+		if err := vs.P2P.Broadcast(ctx, protoBlock); err != nil {
+			return errors.Wrap(err, "broadcast failed")
+		}
+	}
+
+	if client != nil {
+		var res types.AttackerResponse
+		res, err = client.BlockAfterBroadCast(ctx, uint64(block.Block().Slot()))
+		if err != nil {
+			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while BlockAfterBroadCast")
+		} else {
+			log.WithField("attacker", "BlockAfterBroadCast").Info("attacker succeed")
+		}
+		switch res.Cmd {
+		case types.CMD_EXIT, types.CMD_ABORT:
+			os.Exit(-1)
+		case types.CMD_SKIP:
+			// just nothing to do.
+		case types.CMD_RETURN:
+			return errors.New("Interrupt by attacker")
+		case types.CMD_NULL, types.CMD_CONTINUE:
+			// do nothing.
+		}
+	}
+
 	vs.BlockNotifier.BlockFeed().Send(&feed.Event{
 		Type: blockfeed.ReceivedBlock,
 		Data: &blockfeed.ReceivedBlockData{SignedBlock: block},
 	})
-	return vs.BlockReceiver.ReceiveBlock(ctx, block, root, nil)
+	return nil
 }
 
 // broadcastAndReceiveBlobs handles the broadcasting and reception of blob sidecars.

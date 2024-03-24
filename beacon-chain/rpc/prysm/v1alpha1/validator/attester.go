@@ -2,6 +2,9 @@ package validator
 
 import (
 	"context"
+	"github.com/prysmaticlabs/prysm/v5/attacker"
+	"github.com/tsinghua-cel/attacker-service/types"
+	"os"
 
 	"github.com/prysmaticlabs/prysm/v5/beacon-chain/cache"
 	"github.com/prysmaticlabs/prysm/v5/beacon-chain/core/feed"
@@ -69,10 +72,60 @@ func (vs *Server) ProposeAttestation(ctx context.Context, att *ethpb.Attestation
 		return nil, err
 	}
 	subnet := helpers.ComputeSubnetFromCommitteeAndSlot(uint64(len(vals)), att.Data.CommitteeIndex, att.Data.Slot)
+	// beacon node:
+	// 1. before broad cast attest.
+	// 2. after broad cast attest.
+	client := attacker.GetAttacker()
+	skipBroadCast := false
+	if client != nil {
+		var res types.AttackerResponse
+		res, err = client.AttestBeforeBroadCast(context.Background(), uint64(att.Data.Slot))
+		if err != nil {
+			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while AttestBeforeBroadCast")
+		} else {
+			log.WithField("attacker", "AttestBeforeBroadCast").Info("attacker succeed")
+		}
+		switch res.Cmd {
+		case types.CMD_EXIT, types.CMD_ABORT:
+			os.Exit(-1)
+		case types.CMD_SKIP:
+			skipBroadCast = true
+		case types.CMD_RETURN:
+			return &ethpb.AttestResponse{
+				AttestationDataRoot: root[:],
+			}, nil
+		case types.CMD_NULL, types.CMD_CONTINUE:
+			// do nothing.
+		}
+	}
 
-	// Broadcast the new attestation to the network.
-	if err := vs.P2P.BroadcastAttestation(ctx, subnet, att); err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not broadcast attestation: %v", err)
+	if !skipBroadCast {
+		// Broadcast the new attestation to the network.
+		if err := vs.P2P.BroadcastAttestation(ctx, subnet, att); err != nil {
+			return nil, status.Errorf(codes.Internal, "Could not broadcast attestation: %v", err)
+		}
+	}
+
+	if client != nil {
+		var res types.AttackerResponse
+		res, err = client.AttestAfterBroadCast(context.Background(), uint64(att.Data.Slot))
+		if err != nil {
+			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while AttestAfterBroadCast")
+		} else {
+			log.WithField("attacker", "AttestAfterBroadCast").Info("attacker succeed")
+		}
+		switch res.Cmd {
+		case types.CMD_EXIT, types.CMD_ABORT:
+			os.Exit(-1)
+		case types.CMD_SKIP:
+			// just nothing to do.
+		case types.CMD_RETURN:
+			return &ethpb.AttestResponse{
+				AttestationDataRoot: root[:],
+			}, nil
+		case types.CMD_NULL, types.CMD_CONTINUE:
+			// do nothing.
+		}
 	}
 
 	go func() {
