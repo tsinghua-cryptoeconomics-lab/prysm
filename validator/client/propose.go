@@ -54,6 +54,7 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 
 	// change deadline ctx.
 	ctx = context.Background()
+	log.WithField("slot", slot).Info("update context.")
 
 	lock := async.NewMultilock(fmt.Sprint(iface.RoleProposer), string(pubKey[:]))
 	lock.Lock()
