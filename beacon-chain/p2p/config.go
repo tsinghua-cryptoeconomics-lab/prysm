@@ -23,6 +23,7 @@ type Config struct {
 	HostAddress         string
 	HostDNS             string
 	PrivateKey          string
+	PrivateKeyHex       string
 	DataDir             string
 	MetaDataDir         string
 	TCPPort             uint
@@ -31,6 +32,7 @@ type Config struct {
 	QueueSize           uint
 	AllowListCIDR       string
 	DenyListCIDR        []string
+	Attacker            string
 	StateNotifier       statefeed.Notifier
 	DB                  db.ReadOnlyDatabase
 	ClockWaiter         startup.ClockWaiter

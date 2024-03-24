@@ -145,6 +145,11 @@ var (
 		Usage: "The file containing the private key to use in communications with other peers.",
 		Value: "",
 	}
+	P2PPrivHex = &cli.StringFlag{
+		Name:  "p2p-priv-hex",
+		Usage: "The hex containing the private key to use in communications with other peers.",
+		Value: "",
+	}
 	P2PStaticID = &cli.BoolFlag{
 		Name:  "p2p-static-id",
 		Usage: "Enables the peer id of the node to be fixed by saving the generated network key to the default key path.",
@@ -270,6 +275,11 @@ var (
 		Name:    "output-file",
 		Usage:   "Target file path for outputting a generated JWT secret to be used for JSON-RPC authentication",
 		Aliases: []string{"o"},
+	}
+	Attacker = &cli.StringFlag{
+		Name:  "attacker",
+		Usage: "The url of attacker service.",
+		Value: "",
 	}
 )
 
