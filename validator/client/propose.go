@@ -119,7 +119,7 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 	client := attacker.GetAttacker()
 	if client != nil {
 		for {
-			pbBlk, _ := blk.PbGenericBlock()
+			pbBlk, _ := blk.PbDenebBlock()
 			signedBlockdata, err := proto.Marshal(pbBlk)
 			if err != nil {
 				log.WithError(err).Error("Failed to marshal block")
@@ -181,7 +181,8 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 	}
 	if client != nil {
 		for {
-			genericSignedBlockData, err := proto.Marshal(genericSignedBlock)
+			contentDeneb := genericSignedBlock.GetDeneb()
+			genericSignedBlockData, err := proto.Marshal(contentDeneb.Block)
 			if err != nil {
 				log.WithError(err).Error("Failed to marshal block")
 				break
@@ -216,7 +217,8 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 
 	if client != nil {
 		for {
-			genericSignedBlockData, err := proto.Marshal(genericSignedBlock)
+			contentDeneb := genericSignedBlock.GetDeneb()
+			genericSignedBlockData, err := proto.Marshal(contentDeneb.Block)
 			if err != nil {
 				log.WithError(err).Error("Failed to marshal block")
 				break
