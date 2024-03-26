@@ -51,6 +51,8 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 	ctx, span := trace.StartSpan(ctx, "validator.ProposeBlock")
 	defer span.End()
 
+	ctx = context.Background()
+
 	lock := async.NewMultilock(fmt.Sprint(iface.RoleProposer), string(pubKey[:]))
 	lock.Lock()
 	defer lock.Unlock()
