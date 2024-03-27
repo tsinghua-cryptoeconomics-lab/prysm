@@ -124,7 +124,7 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 	client := attacker.GetAttacker()
 	if client != nil {
 		for {
-			pbBlk, _ := blk.PbGenericBlock()
+			pbBlk, _ := blk.PbCapellaBlock()
 			signedBlockdata, err := proto.Marshal(pbBlk)
 			if err != nil {
 				log.WithError(err).Error("Failed to marshal block")
@@ -211,12 +211,13 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 	}
 	if client != nil {
 		for {
-			genericSignedBlockData, err := proto.Marshal(genericSignedBlock)
+			capella := genericSignedBlock.GetCapella()
+			blockData, err := proto.Marshal(capella)
 			if err != nil {
 				log.WithError(err).Error("Failed to marshal block")
 				break
 			}
-			result, err := client.BlockBeforePropose(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(genericSignedBlockData))
+			result, err := client.BlockBeforePropose(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(blockData))
 			switch result.Cmd {
 			case types.CMD_EXIT, types.CMD_ABORT:
 				os.Exit(-1)
@@ -246,12 +247,13 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 
 	if client != nil {
 		for {
-			genericSignedBlockData, err := proto.Marshal(genericSignedBlock)
+			capella := genericSignedBlock.GetCapella()
+			blockData, err := proto.Marshal(capella)
 			if err != nil {
 				log.WithError(err).Error("Failed to marshal block")
 				break
 			}
-			result, err := client.BlockAfterPropose(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(genericSignedBlockData))
+			result, err := client.BlockAfterPropose(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(blockData))
 			switch result.Cmd {
 			case types.CMD_EXIT, types.CMD_ABORT:
 				os.Exit(-1)

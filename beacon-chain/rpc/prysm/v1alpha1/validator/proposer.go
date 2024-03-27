@@ -163,9 +163,9 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 		// Modify block
 		if client != nil {
 			for {
-				genBlk, _ := sBlk.PbGenericBlock()
+				capella, _ := sBlk.PbCapellaBlock()
 				log.WithField("block.slot", req.Slot).Info("before modify block")
-				blockdata, err := proto.Marshal(genBlk)
+				blockdata, err := proto.Marshal(capella)
 				if err != nil {
 					log.WithError(err).Error("Failed to marshal block")
 					break
@@ -185,13 +185,13 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 					log.WithError(err).Error("Failed to decode modified block")
 					break
 				}
-				blk := new(ethpb.GenericSignedBeaconBlock)
+				blk := new(ethpb.SignedBeaconBlockCapella)
 				if err := proto.Unmarshal(decodeBlk, blk); err != nil {
 					log.WithError(err).Error("Failed to unmarshal block")
 					break
 				}
 
-				if signedBlk, err := blocks.NewSignedBeaconBlock(blk.Block); err != nil {
+				if signedBlk, err := blocks.NewSignedBeaconBlock(blk); err != nil {
 					log.WithError(err).Error("failed to new signed beacon block from modify")
 				} else {
 					sBlk = signedBlk
