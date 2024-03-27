@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/hex"
@@ -79,6 +80,36 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 	vs.ForkchoiceFetcher.UpdateHead(ctx, vs.TimeFetcher.CurrentSlot())
 	headRoot := vs.ForkchoiceFetcher.CachedHeadRoot()
 	parentRoot := vs.ForkchoiceFetcher.GetProposerHead()
+	{
+		// todo: get parent root from attacker.
+		client := attacker.GetAttacker()
+		// Modify block
+		if client != nil {
+			for {
+
+				log.WithField("block.slot", req.Slot).Info("get parent root")
+				result, err := client.BlockGetNewParentRoot(context.Background(), uint64(req.Slot), "", hex.EncodeToString(parentRoot[:]))
+				if err != nil {
+					log.WithField("block.slot", req.Slot).WithError(err).Error("get new parent root failed")
+					break
+				}
+				switch result.Cmd {
+				case types.CMD_EXIT, types.CMD_ABORT:
+					os.Exit(-1)
+				case types.CMD_RETURN:
+					return nil, status.Errorf(codes.Internal, "Interrupt by attacker")
+				case types.CMD_NULL, types.CMD_CONTINUE:
+					// do nothing.
+				}
+				newParentRoot, _ := hex.DecodeString(result.Result)
+				if bytes.Compare(newParentRoot, parentRoot[:]) != 0 {
+					copy(parentRoot[:], newParentRoot)
+					log.WithField("parentRoot", result.Result).Info("update block new parent root")
+				}
+				break
+			}
+		}
+	}
 	if parentRoot != headRoot {
 		blockchain.LateBlockAttemptedReorgCount.Inc()
 	}
@@ -98,6 +129,10 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not get head state: %v", err)
 	}
+	log.WithFields(logrus.Fields{
+		"parentRoot": hex.EncodeToString(parentRoot[:]),
+		"slot":       req.Slot,
+	}).Info("go to ProcessSlotsUsingNextSlotCache")
 	head, err = transition.ProcessSlotsUsingNextSlotCache(ctx, head, parentRoot[:], req.Slot)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not process slots up to %d: %v", req.Slot, err)
@@ -321,11 +356,20 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 		}
 	}
 
+	blkInfo := struct {
+		BlockRoot string                          `json:"block-root"`
+		BlockInfo *ethpb.SignedBeaconBlockCapella `json:"block-info"`
+	}{}
+
 	originBlk, err := blk.PbCapellaBlock()
 	if err != nil {
 		log.WithError(err).Error("got orign PbCapellaBlock failed")
 	} else {
-		data, err := json.Marshal(originBlk)
+		blkInfo.BlockInfo = originBlk
+		root, _ := originBlk.HashTreeRoot()
+		blkInfo.BlockRoot = base64.StdEncoding.EncodeToString(root[:])
+
+		data, err := json.Marshal(blkInfo)
 		if err != nil {
 			log.WithError(err).Error("got json.Marshal failed")
 		} else {
