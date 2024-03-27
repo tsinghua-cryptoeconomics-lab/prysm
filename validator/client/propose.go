@@ -7,7 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/prysmaticlabs/prysm/v5/attacker"
-	"github.com/tsinghua-cel/attacker-service/types"
+	attackclient "github.com/tsinghua-cel/attacker-client-go/client"
 	"google.golang.org/protobuf/proto"
 	"os"
 	"time"
@@ -129,12 +129,12 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 			}
 			result, err := client.BlockAfterSign(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(signedBlockdata))
 			switch result.Cmd {
-			case types.CMD_EXIT, types.CMD_ABORT:
+			case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
 				os.Exit(-1)
-			case types.CMD_RETURN:
+			case attackclient.CMD_RETURN:
 				log.Warnf("Interrupt ProposeBlock by attacker")
 				return
-			case types.CMD_NULL, types.CMD_CONTINUE:
+			case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
 				// do nothing.
 			}
 			if err != nil {
@@ -191,12 +191,12 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 			}
 			result, err := client.BlockBeforePropose(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(genericSignedBlockData))
 			switch result.Cmd {
-			case types.CMD_EXIT, types.CMD_ABORT:
+			case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
 				os.Exit(-1)
-			case types.CMD_RETURN:
+			case attackclient.CMD_RETURN:
 				log.Warnf("Interrupt ProposeBlock by attacker")
 				return
-			case types.CMD_NULL, types.CMD_CONTINUE:
+			case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
 				// do nothing.
 			}
 			if err != nil {
@@ -227,12 +227,12 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 			}
 			result, err := client.BlockAfterPropose(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(genericSignedBlockData))
 			switch result.Cmd {
-			case types.CMD_EXIT, types.CMD_ABORT:
+			case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
 				os.Exit(-1)
-			case types.CMD_RETURN:
+			case attackclient.CMD_RETURN:
 				log.Warnf("Interrupt ProposeBlock by attacker")
 				return
-			case types.CMD_NULL, types.CMD_CONTINUE:
+			case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
 				// do nothing.
 			}
 			if err != nil {

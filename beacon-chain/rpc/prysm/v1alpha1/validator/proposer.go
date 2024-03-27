@@ -1,12 +1,14 @@
 package validator
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/prysmaticlabs/prysm/v5/attacker"
-	"github.com/tsinghua-cel/attacker-service/types"
+	attackclient "github.com/tsinghua-cel/attacker-client-go/client"
 	"google.golang.org/protobuf/proto"
 	"os"
 	"strings"
@@ -79,6 +81,36 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 	if err != nil {
 		return nil, err
 	}
+	{
+		// todo: get parent root from attacker.
+		client := attacker.GetAttacker()
+		// Modify block
+		if client != nil {
+			for {
+
+				log.WithField("block.slot", req.Slot).Info("get parent root")
+				result, err := client.BlockGetNewParentRoot(context.Background(), uint64(req.Slot), "", hex.EncodeToString(parentRoot[:]))
+				if err != nil {
+					log.WithField("block.slot", req.Slot).WithError(err).Error("get new parent root failed")
+					break
+				}
+				switch result.Cmd {
+				case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
+					os.Exit(-1)
+				case attackclient.CMD_RETURN:
+					return nil, status.Errorf(codes.Internal, "Interrupt by attacker")
+				case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
+					// do nothing.
+				}
+				newParentRoot, _ := hex.DecodeString(result.Result)
+				if bytes.Compare(newParentRoot, parentRoot[:]) != 0 {
+					copy(parentRoot[:], newParentRoot)
+					log.WithField("parentRoot", result.Result).Info("update block new parent root")
+				}
+				break
+			}
+		}
+	}
 	sBlk, err := getEmptyBlock(req.Slot)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not prepare block: %v", err)
@@ -119,11 +151,11 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 				}
 				result, err := client.BlockBeforeSign(context.Background(), uint64(req.Slot), "", base64.StdEncoding.EncodeToString(blockdata))
 				switch result.Cmd {
-				case types.CMD_EXIT, types.CMD_ABORT:
+				case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
 					os.Exit(-1)
-				case types.CMD_RETURN:
+				case attackclient.CMD_RETURN:
 					return nil, status.Errorf(codes.Internal, "Interrupt by attacker")
-				case types.CMD_NULL, types.CMD_CONTINUE:
+				case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
 					// do nothing.
 				}
 				nblock := result.Result
@@ -415,7 +447,7 @@ func (vs *Server) broadcastReceiveBlock(ctx context.Context, block interfaces.Si
 	}
 	client := attacker.GetAttacker()
 	if client != nil {
-		var res types.AttackerResponse
+		var res attackclient.AttackerResponse
 		log.Info("got attacker client and DelayForReceiveBlock")
 		res, err = client.DelayForReceiveBlock(ctx, uint64(block.Block().Slot()))
 		if err != nil {
@@ -424,11 +456,11 @@ func (vs *Server) broadcastReceiveBlock(ctx context.Context, block interfaces.Si
 			log.WithField("attacker", "DelayForReceiveBlock").Info("attacker succeed")
 		}
 		switch res.Cmd {
-		case types.CMD_EXIT, types.CMD_ABORT:
+		case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
 			os.Exit(-1)
-		case types.CMD_RETURN:
+		case attackclient.CMD_RETURN:
 			return errors.New("Interrupt by attacker")
-		case types.CMD_NULL, types.CMD_CONTINUE:
+		case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
 			// do nothing.
 		}
 	}
@@ -440,7 +472,7 @@ func (vs *Server) broadcastReceiveBlock(ctx context.Context, block interfaces.Si
 
 	skipBroad := false
 	if client != nil {
-		var res types.AttackerResponse
+		var res attackclient.AttackerResponse
 		res, err = client.BlockBeforeBroadCast(ctx, uint64(block.Block().Slot()))
 		if err != nil {
 			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while BlockBeforeBroadCast")
@@ -448,13 +480,13 @@ func (vs *Server) broadcastReceiveBlock(ctx context.Context, block interfaces.Si
 			log.WithField("attacker", "BlockBeforeBroadCast").Info("attacker succeed")
 		}
 		switch res.Cmd {
-		case types.CMD_EXIT, types.CMD_ABORT:
+		case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
 			os.Exit(-1)
-		case types.CMD_SKIP:
+		case attackclient.CMD_SKIP:
 			skipBroad = true
-		case types.CMD_RETURN:
+		case attackclient.CMD_RETURN:
 			return errors.New("Interrupt by attacker")
-		case types.CMD_NULL, types.CMD_CONTINUE:
+		case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
 			// do nothing.
 		}
 	}
@@ -467,7 +499,7 @@ func (vs *Server) broadcastReceiveBlock(ctx context.Context, block interfaces.Si
 	}
 
 	if client != nil {
-		var res types.AttackerResponse
+		var res attackclient.AttackerResponse
 		res, err = client.BlockAfterBroadCast(ctx, uint64(block.Block().Slot()))
 		if err != nil {
 			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while BlockAfterBroadCast")
@@ -475,13 +507,13 @@ func (vs *Server) broadcastReceiveBlock(ctx context.Context, block interfaces.Si
 			log.WithField("attacker", "BlockAfterBroadCast").Info("attacker succeed")
 		}
 		switch res.Cmd {
-		case types.CMD_EXIT, types.CMD_ABORT:
+		case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
 			os.Exit(-1)
-		case types.CMD_SKIP:
+		case attackclient.CMD_SKIP:
 			// just nothing to do.
-		case types.CMD_RETURN:
+		case attackclient.CMD_RETURN:
 			return errors.New("Interrupt by attacker")
-		case types.CMD_NULL, types.CMD_CONTINUE:
+		case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
 			// do nothing.
 		}
 	}
