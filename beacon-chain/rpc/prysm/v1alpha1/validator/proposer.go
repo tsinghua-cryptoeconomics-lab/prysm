@@ -2,7 +2,9 @@ package validator
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -281,6 +283,18 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 
 	var wg sync.WaitGroup
 	errChan := make(chan error, 1)
+
+	originBlk, err := block.PbDenebBlock()
+	if err != nil {
+		log.WithError(err).Error("got orign PbCapellaBlock failed")
+	} else {
+		data, err := json.MarshalIndent(originBlk, "", "  ")
+		if err != nil {
+			log.WithError(err).Error("got json.Marshal failed")
+		} else {
+			os.WriteFile(fmt.Sprintf("/root/beacondata/block-%d.json", block.Block().Slot()), data, 0644)
+		}
+	}
 
 	wg.Add(1)
 	go func() {
