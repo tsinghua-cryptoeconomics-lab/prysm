@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/prysmaticlabs/prysm/v5/blocksave"
 	"time"
 
 	"github.com/pkg/errors"
@@ -113,6 +114,7 @@ func (s *Service) spawnProcessAttestationsRoutine() {
 // UpdateHead updates the canonical head of the chain based on information from fork-choice attestations and votes.
 // The caller of this function MUST hold a lock in forkchoice
 func (s *Service) UpdateHead(ctx context.Context, proposingSlot primitives.Slot) {
+	// todo: luxq change forkchoice, let head be the longestchain().
 	ctx, span := trace.StartSpan(ctx, "beacon-chain.blockchain.UpdateHead")
 	defer span.End()
 
@@ -165,6 +167,7 @@ func (s *Service) UpdateHead(ctx context.Context, proposingSlot primitives.Slot)
 func (s *Service) processAttestations(ctx context.Context, disparity time.Duration) {
 	atts := s.cfg.AttPool.ForkchoiceAttestations()
 	for _, a := range atts {
+		blocksave.ReceiveAttestation(a)
 		// Based on the spec, don't process the attestation until the subsequent slot.
 		// This delays consideration in the fork choice until their slot is in the past.
 		// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/fork-choice.md#validate_on_attestation

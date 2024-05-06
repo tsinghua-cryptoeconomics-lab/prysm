@@ -176,6 +176,8 @@ func (vs *Server) getParentStateFromReorgData(ctx context.Context, slot primitiv
 }
 
 func (vs *Server) getParentState(ctx context.Context, slot primitives.Slot) (state.BeaconState, [32]byte, error) {
+	// todo: luxq let parent be the latest stable block parent
+
 	// process attestations and update head in forkchoice
 	oldHeadRoot := vs.ForkchoiceFetcher.CachedHeadRoot()
 	vs.ForkchoiceFetcher.UpdateHead(ctx, vs.TimeFetcher.CurrentSlot())
