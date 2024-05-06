@@ -56,3 +56,5 @@ func CheckBlock(slot uint64) bool {
 	}
 	return false
 }
+
+// todo: add api to query block status (stabled or unstabled)
