@@ -8,6 +8,10 @@ import (
 	"sync"
 )
 
+const (
+	TotalValidatorCount = 64
+)
+
 type ChainNode struct {
 	forked map[string]*ChainNode
 	root   []byte
@@ -15,6 +19,38 @@ type ChainNode struct {
 	parent *ChainNode
 	attest map[string]*ethpb.Attestation
 	mux    sync.Mutex
+}
+
+func (n *ChainNode) Stabled() bool {
+	n.mux.Lock()
+	defer n.mux.Unlock()
+	if len(n.attest) >= TotalValidatorCount/3 {
+		return true
+	}
+	stableFlag := n.block.Block().Body().Graffiti()[0]
+	return stableFlag == 1
+}
+
+func changeUnstableToStable(unstable int64) int64 {
+	stable := unstable * 2 / 5
+	return stable
+}
+
+func (n *ChainNode) CalcLength() int64 {
+	unstabledCount := int64(0)
+	stabledCount := int64(0)
+	n.mux.Lock()
+	defer n.mux.Unlock()
+	start := n
+	for start != nil {
+		if start.Stabled() {
+			stabledCount++
+		} else {
+			unstabledCount++
+		}
+		start = start.parent
+	}
+	return stabledCount + changeUnstableToStable(unstabledCount)
 }
 
 type ChainTree struct {
@@ -99,4 +135,47 @@ func (a *ChainTree) GetBlockBySlot(slot int64) *ChainNode {
 		return node
 	}
 	return nil
+}
+
+func (a *ChainTree) IteratorAllNode(todo func(node *ChainNode)) {
+	a.mux.Lock()
+	defer a.mux.Unlock()
+	// implement iterator method for all node from root node
+	if a.rootNode == nil {
+		return
+	}
+	queue := []*ChainNode{a.rootNode}
+	for len(queue) > 0 {
+		node := queue[0]
+		queue = queue[1:]
+		todo(node)
+		for _, n := range node.forked {
+			queue = append(queue, n)
+		}
+	}
+}
+
+func (a *ChainTree) GetAllLatestBlock() []*ChainNode {
+	var res []*ChainNode
+	a.IteratorAllNode(func(node *ChainNode) {
+		if node.forked == nil || len(node.forked) == 0 {
+			res = append(res, node)
+		}
+	})
+	return res
+}
+
+func (a *ChainTree) GetLongestChain() *ChainNode {
+	allLeaf := a.GetAllLatestBlock()
+	var longest *ChainNode
+	for _, node := range allLeaf {
+		if longest == nil {
+			longest = node
+		} else {
+			if node.CalcLength() > longest.CalcLength() {
+				longest = node
+			}
+		}
+	}
+	return longest
 }
