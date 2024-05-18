@@ -167,7 +167,7 @@ func (s *Service) UpdateHead(ctx context.Context, proposingSlot primitives.Slot)
 func (s *Service) processAttestations(ctx context.Context, disparity time.Duration) {
 	atts := s.cfg.AttPool.ForkchoiceAttestations()
 	for _, a := range atts {
-		blocksave.ReceiveAttestation(a)
+		blocksave.ReceiveAttestation(s.genesisTime, a)
 		// Based on the spec, don't process the attestation until the subsequent slot.
 		// This delays consideration in the fork choice until their slot is in the past.
 		// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/fork-choice.md#validate_on_attestation

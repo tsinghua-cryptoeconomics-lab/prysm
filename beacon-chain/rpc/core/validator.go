@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/prysmaticlabs/prysm/v5/blocksave"
 	"sort"
 	"time"
 
@@ -343,12 +344,19 @@ func (s *Service) GetAttestationData(
 
 	s.AttestationCache.RLock()
 	res := s.AttestationCache.Get()
+
+	// todo: luxq add update attest head root.
+	checkpoint := s.FinalizedFetcher.FinalizedCheckpt()
+	headNode := blocksave.GetLongestChain(checkpoint)
+
+	root, _ := headNode.Block().Block().HashTreeRoot()
 	if res != nil && res.Slot == req.Slot {
 		s.AttestationCache.RUnlock()
 		return &ethpb.AttestationData{
-			Slot:            res.Slot,
-			CommitteeIndex:  req.CommitteeIndex,
-			BeaconBlockRoot: res.HeadRoot,
+			Slot:           res.Slot,
+			CommitteeIndex: req.CommitteeIndex,
+			//BeaconBlockRoot: res.HeadRoot,
+			BeaconBlockRoot: root[:],
 			Source: &ethpb.Checkpoint{
 				Epoch: res.Source.Epoch,
 				Root:  res.Source.Root[:],

@@ -4,14 +4,16 @@ import (
 	"encoding/hex"
 	"github.com/prysmaticlabs/prysm/v5/consensus-types/interfaces"
 	ethpb "github.com/prysmaticlabs/prysm/v5/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v5/time/slots"
 	"github.com/sirupsen/logrus"
+	"time"
 )
 
 var (
 	chainTree = NewChainTree()
 )
 
-func ReceiveBlock(block interfaces.ReadOnlySignedBeaconBlock) {
+func ReceiveBlock(genesisTime time.Time, block interfaces.ReadOnlySignedBeaconBlock) {
 	root, _ := block.Block().HashTreeRoot()
 	parentRoot := block.Block().ParentRoot()
 
@@ -23,14 +25,42 @@ func ReceiveBlock(block interfaces.ReadOnlySignedBeaconBlock) {
 	chainTree.AddBlock(block)
 }
 
-func ReceiveAttestation(attest *ethpb.Attestation) {
+func ReceiveAttestation(genesisTime time.Time, attest *ethpb.Attestation) {
+	curSlot := slots.CurrentSlot(uint64(genesisTime.Unix()))
+	if attest.Data.Slot != curSlot {
+		logrus.WithFields(logrus.Fields{
+			"attest_slot": attest.Data.Slot,
+			"cur_slot":    curSlot,
+		}).Warn("ignore attestation slot because it is not equal to current slot")
+		return
+	}
 	chainTree.AddAttestation(attest)
-	// todo: update block status (stabled or unstabled)
+	// update block status (stabled or unstabled)
+	chainTree.UpdateBlockStatus(attest)
 }
 
-// todo: add api to query block status (stabled or unstabled)
-func QueryBlockStatus(slot int64) byte {
+// QueryBlockStatus query block status (stabled or unstabled)
+func QueryBlockStatus(slot int64) bool {
 	node := chainTree.GetBlockBySlot(slot)
-	custom := node.block.Block().Body().Graffiti()
-	return custom[0]
+	return node.stabled
+}
+
+func GetLatestHead(slot int64, checkpoint *ethpb.Checkpoint) *ChainNode {
+	for i := slot; i > 0; i-- {
+		parent := chainTree.FilterLatestBlock(i, checkpoint)
+		if parent == nil {
+			continue
+		} else {
+			return parent
+		}
+	}
+	return nil
+}
+
+func GetLongestChainWithStableTransport(checkpoint *ethpb.Checkpoint) *ChainNode {
+	return chainTree.GetLongestChainWithStableTransport(checkpoint)
+}
+
+func GetLongestChain(checkpoint *ethpb.Checkpoint) *ChainNode {
+	return chainTree.GetLongestChainWithStableTransport(checkpoint)
 }

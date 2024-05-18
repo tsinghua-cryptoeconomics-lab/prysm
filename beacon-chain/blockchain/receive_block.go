@@ -70,7 +70,7 @@ func (s *Service) ReceiveBlock(ctx context.Context, block interfaces.ReadOnlySig
 	s.blockBeingSynced.set(blockRoot)
 	defer s.blockBeingSynced.unset(blockRoot)
 
-	blocksave.ReceiveBlock(block)
+	blocksave.ReceiveBlock(s.genesisTime, block)
 
 	blockCopy, err := block.Copy()
 	if err != nil {
