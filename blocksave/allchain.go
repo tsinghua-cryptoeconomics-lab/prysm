@@ -201,8 +201,9 @@ type ChainTree struct {
 
 func NewChainTree() *ChainTree {
 	return &ChainTree{
-		rootNode:   nil,
-		blockCache: make(map[string]*ChainNode),
+		rootNode:       nil,
+		blockCache:     make(map[string]*ChainNode),
+		blockSlotCache: make(map[int64]*ChainNode),
 	}
 }
 
