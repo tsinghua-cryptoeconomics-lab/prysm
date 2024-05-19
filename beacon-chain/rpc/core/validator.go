@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"github.com/prysmaticlabs/prysm/v5/blocksave"
 	"sort"
@@ -353,7 +354,7 @@ func (s *Service) GetAttestationData(
 		res.HeadRoot = root[:]
 		logrus.WithFields(logrus.Fields{
 			"slot":     req.Slot,
-			"headRoot": res.HeadRoot,
+			"headRoot": hex.EncodeToString(res.HeadRoot),
 		}).Info("Update Attestation BeaconBlockRoot in GetAttestationData")
 
 	}
