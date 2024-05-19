@@ -213,6 +213,8 @@ func (a *ChainTree) AddBlock(block interfaces.ReadOnlySignedBeaconBlock) *ChainN
 		defer a.mux.Unlock()
 		root, _ := block.Block().HashTreeRoot()
 		node := &ChainNode{
+			forked: make(map[string]*ChainNode),
+			attest: make(map[string]*ethpb.Attestation),
 			root:   root[:],
 			block:  block,
 			parent: nil,
@@ -232,6 +234,8 @@ func (a *ChainTree) AddBlock(block interfaces.ReadOnlySignedBeaconBlock) *ChainN
 				root:   root[:],
 				block:  block,
 				parent: node,
+				forked: make(map[string]*ChainNode),
+				attest: make(map[string]*ethpb.Attestation),
 			}
 			node.forked[hex.EncodeToString(root[:])] = newNode
 			a.blockCache[hex.EncodeToString(root[:])] = newNode
