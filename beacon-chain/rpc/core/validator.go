@@ -345,12 +345,17 @@ func (s *Service) GetAttestationData(
 	s.AttestationCache.RLock()
 	res := s.AttestationCache.Get()
 
-	if res.Slot > 1 {
+	if res != nil && res.Slot > 1 {
 		// todo: luxq add update attest head root.
 		checkpoint := s.FinalizedFetcher.FinalizedCheckpt()
 		headNode := blocksave.GetLongestChain(checkpoint)
 		root, _ := headNode.Block().Block().HashTreeRoot()
 		res.HeadRoot = root[:]
+		logrus.WithFields(logrus.Fields{
+			"slot":     req.Slot,
+			"headRoot": res.HeadRoot,
+		}).Info("Update Attestation BeaconBlockRoot in GetAttestationData")
+
 	}
 
 	if res != nil && res.Slot == req.Slot {
