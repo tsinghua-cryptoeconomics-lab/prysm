@@ -209,20 +209,25 @@ func (vs *Server) getParentStateFromReorgData(ctx context.Context, slot primitiv
 }
 
 func (vs *Server) getParentState(ctx context.Context, slot primitives.Slot) (state.BeaconState, [32]byte, error) {
-	// todo: luxq let parent be the latest stable block parent
-	checkpoint := vs.FinalizationFetcher.FinalizedCheckpt()
-	parent := blocksave.GetLatestHead(int64(slot), checkpoint)
-	parentRoot, _ := parent.Block().Block().HashTreeRoot()
-	head, err := vs.getParentStateForReorg(ctx, slot, parentRoot)
-	return head, parentRoot, err
 
-	//// process attestations and update head in forkchoice
-	//oldHeadRoot := vs.ForkchoiceFetcher.CachedHeadRoot()
-	//vs.ForkchoiceFetcher.UpdateHead(ctx, vs.TimeFetcher.CurrentSlot())
-	//headRoot := vs.ForkchoiceFetcher.CachedHeadRoot()
-	//parentRoot := vs.ForkchoiceFetcher.GetProposerHead()
-	//head, err := vs.getParentStateFromReorgData(ctx, slot, oldHeadRoot, parentRoot, headRoot)
-	//return head, parentRoot, err
+	if int64(slot) > 1 {
+		// todo: luxq let parent be the latest stable block parent
+		checkpoint := vs.FinalizationFetcher.FinalizedCheckpt()
+		parent := blocksave.GetLatestHead(int64(slot), checkpoint)
+		parentRoot, _ := parent.Block().Block().HashTreeRoot()
+		head, err := vs.getParentStateForReorg(ctx, slot, parentRoot)
+		return head, parentRoot, err
+	} else {
+
+		// process attestations and update head in forkchoice
+		oldHeadRoot := vs.ForkchoiceFetcher.CachedHeadRoot()
+		vs.ForkchoiceFetcher.UpdateHead(ctx, vs.TimeFetcher.CurrentSlot())
+		headRoot := vs.ForkchoiceFetcher.CachedHeadRoot()
+		parentRoot := vs.ForkchoiceFetcher.GetProposerHead()
+		head, err := vs.getParentStateFromReorgData(ctx, slot, oldHeadRoot, parentRoot, headRoot)
+		return head, parentRoot, err
+
+	}
 }
 
 func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.SignedBeaconBlock, head state.BeaconState, skipMevBoost bool, builderBoostFactor uint64) error {

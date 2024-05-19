@@ -345,18 +345,20 @@ func (s *Service) GetAttestationData(
 	s.AttestationCache.RLock()
 	res := s.AttestationCache.Get()
 
-	// todo: luxq add update attest head root.
-	checkpoint := s.FinalizedFetcher.FinalizedCheckpt()
-	headNode := blocksave.GetLongestChain(checkpoint)
+	if res.Slot > 1 {
+		// todo: luxq add update attest head root.
+		checkpoint := s.FinalizedFetcher.FinalizedCheckpt()
+		headNode := blocksave.GetLongestChain(checkpoint)
+		root, _ := headNode.Block().Block().HashTreeRoot()
+		res.HeadRoot = root[:]
+	}
 
-	root, _ := headNode.Block().Block().HashTreeRoot()
 	if res != nil && res.Slot == req.Slot {
 		s.AttestationCache.RUnlock()
 		return &ethpb.AttestationData{
-			Slot:           res.Slot,
-			CommitteeIndex: req.CommitteeIndex,
-			//BeaconBlockRoot: res.HeadRoot,
-			BeaconBlockRoot: root[:],
+			Slot:            res.Slot,
+			CommitteeIndex:  req.CommitteeIndex,
+			BeaconBlockRoot: res.HeadRoot,
 			Source: &ethpb.Checkpoint{
 				Epoch: res.Source.Epoch,
 				Root:  res.Source.Root[:],
