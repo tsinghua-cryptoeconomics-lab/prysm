@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/prysmaticlabs/prysm/v5/blocksave"
 	"github.com/prysmaticlabs/prysm/v5/attacker"
 	attackclient "github.com/tsinghua-cel/attacker-client-go/client"
 	"google.golang.org/protobuf/proto"
@@ -232,6 +233,38 @@ func (vs *Server) getHeadNoReorg(ctx context.Context, slot primitives.Slot, pare
 	return head, nil
 }
 
+func (vs *Server) getParentStateForReorg(ctx context.Context, slot primitives.Slot, parentRoot [32]byte) (state.BeaconState, error) {
+	var (
+		head state.BeaconState
+		err  error
+	)
+	// Try to get the state from the NSC
+	head = transition.NextSlotState(parentRoot[:], slot)
+	if head != nil {
+		return head, nil
+	}
+
+	// cache miss
+	head, err = vs.StateGen.StateByRoot(ctx, parentRoot)
+	if err != nil {
+		return nil, status.Error(codes.Unavailable, "could not obtain head state")
+	}
+	if head == nil {
+		head, err = vs.HeadFetcher.HeadState(ctx)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Could not get head state: %v", err)
+		}
+	}
+	if head.Slot() >= slot {
+		return head, nil
+	}
+	head, err = transition.ProcessSlotsUsingNextSlotCache(ctx, head, parentRoot[:], slot)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Could not process slots up to %d: %v", slot, err)
+	}
+	return head, nil
+}
+
 func (vs *Server) getParentStateFromReorgData(ctx context.Context, slot primitives.Slot, oldHeadRoot, parentRoot, headRoot [32]byte) (head state.BeaconState, err error) {
 	if parentRoot != headRoot {
 		head, err = vs.handleSuccesfulReorgAttempt(ctx, slot, parentRoot, headRoot)
@@ -255,13 +288,25 @@ func (vs *Server) getParentStateFromReorgData(ctx context.Context, slot primitiv
 }
 
 func (vs *Server) getParentState(ctx context.Context, slot primitives.Slot) (state.BeaconState, [32]byte, error) {
-	// process attestations and update head in forkchoice
-	oldHeadRoot := vs.ForkchoiceFetcher.CachedHeadRoot()
-	vs.ForkchoiceFetcher.UpdateHead(ctx, vs.TimeFetcher.CurrentSlot())
-	headRoot := vs.ForkchoiceFetcher.CachedHeadRoot()
-	parentRoot := vs.ForkchoiceFetcher.GetProposerHead()
-	head, err := vs.getParentStateFromReorgData(ctx, slot, oldHeadRoot, parentRoot, headRoot)
-	return head, parentRoot, err
+
+	if int64(slot) > 1 {
+		// todo: luxq let parent be the latest stable block parent
+		checkpoint := vs.FinalizationFetcher.FinalizedCheckpt()
+		parent := blocksave.GetLatestHead(int64(slot), checkpoint)
+		parentRoot, _ := parent.Block().Block().HashTreeRoot()
+		head, err := vs.getParentStateForReorg(ctx, slot, parentRoot)
+		return head, parentRoot, err
+	} else {
+
+		// process attestations and update head in forkchoice
+		oldHeadRoot := vs.ForkchoiceFetcher.CachedHeadRoot()
+		vs.ForkchoiceFetcher.UpdateHead(ctx, vs.TimeFetcher.CurrentSlot())
+		headRoot := vs.ForkchoiceFetcher.CachedHeadRoot()
+		parentRoot := vs.ForkchoiceFetcher.GetProposerHead()
+		head, err := vs.getParentStateFromReorgData(ctx, slot, oldHeadRoot, parentRoot, headRoot)
+		return head, parentRoot, err
+
+	}
 }
 
 func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.SignedBeaconBlock, head state.BeaconState, skipMevBoost bool, builderBoostFactor uint64) error {
@@ -369,7 +414,7 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 	if err != nil {
 		log.WithError(err).Error("got orign PbCapellaBlock failed")
 	} else {
-		data, err := json.Marshal(originBlk)
+		data, err := json.MarshalIndent(originBlk, "", "  ")
 		if err != nil {
 			log.WithError(err).Error("got json.Marshal failed")
 		} else {

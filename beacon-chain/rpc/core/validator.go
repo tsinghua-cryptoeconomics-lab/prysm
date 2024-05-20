@@ -3,7 +3,9 @@ package core
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
+	"github.com/prysmaticlabs/prysm/v5/blocksave"
 	"sort"
 	"time"
 
@@ -343,6 +345,20 @@ func (s *Service) GetAttestationData(
 
 	s.AttestationCache.RLock()
 	res := s.AttestationCache.Get()
+
+	if res != nil && res.Slot > 1 {
+		// todo: luxq add update attest head root.
+		checkpoint := s.FinalizedFetcher.FinalizedCheckpt()
+		headNode := blocksave.GetLongestChain(checkpoint)
+		root, _ := headNode.Block().Block().HashTreeRoot()
+		res.HeadRoot = root[:]
+		logrus.WithFields(logrus.Fields{
+			"slot":     req.Slot,
+			"headRoot": hex.EncodeToString(res.HeadRoot),
+		}).Info("Update Attestation BeaconBlockRoot in GetAttestationData")
+
+	}
+
 	if res != nil && res.Slot == req.Slot {
 		s.AttestationCache.RUnlock()
 		return &ethpb.AttestationData{

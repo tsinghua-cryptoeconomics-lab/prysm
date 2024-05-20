@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/prysmaticlabs/prysm/v5/blocksave"
 	"time"
 
 	"github.com/pkg/errors"
@@ -68,6 +69,8 @@ func (s *Service) ReceiveBlock(ctx context.Context, block interfaces.ReadOnlySig
 	receivedTime := time.Now()
 	s.blockBeingSynced.set(blockRoot)
 	defer s.blockBeingSynced.unset(blockRoot)
+
+	blocksave.ReceiveBlock(s.genesisTime, block)
 
 	blockCopy, err := block.Copy()
 	if err != nil {
@@ -381,10 +384,13 @@ func (s *Service) validateStateTransition(ctx context.Context, preState state.Be
 
 // updateJustificationOnBlock updates the justified checkpoint on DB if the
 // incoming block has updated it on forkchoice.
-func (s *Service) updateJustificationOnBlock(ctx context.Context, preState, postState state.BeaconState, preJustifiedEpoch primitives.Epoch) error {
+func (s *Service) updateJustificationOnBlock(ctx context.Context, preState, postState state.BeaconState,
+	preJustifiedEpoch primitives.Epoch) error {
+
 	justified := s.cfg.ForkChoiceStore.JustifiedCheckpoint()
 	preStateJustifiedEpoch := preState.CurrentJustifiedCheckpoint().Epoch
 	postStateJustifiedEpoch := postState.CurrentJustifiedCheckpoint().Epoch
+	// todo: luxq update 𝐿𝐽 if cross epoch boundary  // or receive early block
 	if justified.Epoch > preJustifiedEpoch || (justified.Epoch == postStateJustifiedEpoch && justified.Epoch > preStateJustifiedEpoch) {
 		if err := s.cfg.BeaconDB.SaveJustifiedCheckpoint(ctx, &ethpb.Checkpoint{
 			Epoch: justified.Epoch, Root: justified.Root[:],
