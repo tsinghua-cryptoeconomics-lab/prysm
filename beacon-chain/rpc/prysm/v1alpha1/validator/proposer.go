@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/prysmaticlabs/prysm/v5/blocksave"
 	"github.com/prysmaticlabs/prysm/v5/attacker"
+	"github.com/prysmaticlabs/prysm/v5/blocksave"
 	attackclient "github.com/tsinghua-cel/attacker-client-go/client"
 	"google.golang.org/protobuf/proto"
 	"os"
@@ -54,6 +55,19 @@ const (
 // GetBeaconBlock is called by a proposer during its assigned slot to request a block to sign
 // by passing in the slot and the signed randao reveal of the slot.
 func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (*ethpb.GenericBeaconBlock, error) {
+	t1 := time.Now()
+	defer func() {
+		t2 := time.Now()
+		file, err := os.Create("/root/beacondata/GetBeaconBlock.csv")
+		if err != nil {
+			log.WithError(err).Error("Failed to create file for getBeaconBlock.csv")
+		} else {
+			writer := csv.NewWriter(file)
+			writer.Write([]string{fmt.Sprintf("%d", int64(req.Slot)), fmt.Sprintf("%d", t2.Sub(t1).Milliseconds())})
+			writer.Flush()
+			file.Close()
+		}
+	}()
 	ctx, span := trace.StartSpan(ctx, "ProposerServer.GetBeaconBlock")
 	defer span.End()
 	span.AddAttributes(trace.Int64Attribute("slot", int64(req.Slot)))
