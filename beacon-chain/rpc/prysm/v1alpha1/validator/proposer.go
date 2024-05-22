@@ -52,7 +52,7 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 	t1 := time.Now()
 	defer func() {
 		t2 := time.Now()
-		file, err := os.OpenFile("/root/beacondata/GetBeaconBlock.csv", os.O_WRONLY|os.O_APPEND, 0666)
+		file, err := os.OpenFile("/root/beacondata/GetBeaconBlock.csv", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 		if err != nil {
 			log.WithError(err).Error("Failed to create file for getBeaconBlock.csv")
 		} else {
