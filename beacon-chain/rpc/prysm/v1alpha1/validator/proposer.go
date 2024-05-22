@@ -1,10 +1,10 @@
 package validator
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -58,13 +58,13 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 	t1 := time.Now()
 	defer func() {
 		t2 := time.Now()
-		file, err := os.Create("/root/beacondata/GetBeaconBlock.csv")
+		file, err := os.OpenFile("/root/beacondata/GetBeaconBlock.csv", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 		if err != nil {
 			log.WithError(err).Error("Failed to create file for getBeaconBlock.csv")
 		} else {
-			writer := csv.NewWriter(file)
-			writer.Write([]string{fmt.Sprintf("%d", int64(req.Slot)), fmt.Sprintf("%d", t2.Sub(t1).Milliseconds())})
-			writer.Flush()
+			write := bufio.NewWriter(file)
+			write.WriteString(fmt.Sprintf("%d,%d\n", int64(req.Slot), t2.Sub(t1).Milliseconds()))
+			write.Flush()
 			file.Close()
 		}
 	}()
