@@ -77,7 +77,6 @@ require (
 	github.com/supranational/blst v0.3.11
 	github.com/thomaso-mirodin/intmath v0.0.0-20160323211736-5dc6d854e46e
 	github.com/trailofbits/go-mutexasserts v0.0.0-20230328101604-8cdbc5f3d279
-	github.com/tsinghua-cel/attacker-client-go v0.0.0-20240327100625-59b6817e3962
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/urfave/cli/v2 v2.25.7
 	github.com/uudashr/gocognit v1.0.5
@@ -226,6 +225,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
+	github.com/tsinghua-cel/attacker-client-go v0.0.1
 	github.com/uber/jaeger-client-go v2.25.0+incompatible // indirect
 	github.com/wealdtech/go-eth2-types/v2 v2.5.2 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
