@@ -99,6 +99,10 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 	{
 		// todo: get parent root from attacker.
 		client := attacker.GetAttacker()
+		log.WithFields(logrus.Fields{
+			"block.slot": req.Slot,
+			"client":     client,
+		}).Info("goto get new parent root")
 		// Modify block
 		if client != nil {
 			for {
@@ -153,6 +157,7 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 	}
 
 	{
+		log.WithField("block.slot", req.Slot).Info("before compute state root")
 		client := attacker.GetAttacker()
 		// Modify block
 		if client != nil {
