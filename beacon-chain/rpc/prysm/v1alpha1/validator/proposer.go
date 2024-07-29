@@ -70,6 +70,21 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 	}()
 	ctx, span := trace.StartSpan(ctx, "ProposerServer.GetBeaconBlock")
 	defer span.End()
+	// add generate block time cost.
+	t1 := time.Now()
+	defer func() {
+		t2 := time.Now()
+		file, err := os.OpenFile("/root/beacondata/GetBeaconBlock.csv", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+		if err != nil {
+			log.WithError(err).Error("Failed to create file for GetBeaconBlock.csv")
+		} else {
+			write := bufio.NewWriter(file)
+			write.WriteString(fmt.Sprintf("%d,%d\n", int64(req.Slot), t2.Sub(t1).Milliseconds()))
+			write.Flush()
+			file.Close()
+		}
+	}()
+
 	span.AddAttributes(trace.Int64Attribute("slot", int64(req.Slot)))
 
 	t, err := slots.ToTime(uint64(vs.TimeFetcher.GenesisTime().Unix()), req.Slot)

@@ -1,7 +1,10 @@
 package blockchain
 
 import (
+	"bufio"
 	"context"
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/pkg/errors"
@@ -39,6 +42,21 @@ import (
 func (s *Service) OnAttestation(ctx context.Context, a *ethpb.Attestation, disparity time.Duration) error {
 	ctx, span := trace.StartSpan(ctx, "blockChain.onAttestation")
 	defer span.End()
+
+	// add attestation verify time cost.
+	t1 := time.Now()
+	defer func() {
+		t2 := time.Now()
+		file, err := os.OpenFile("/root/beacondata/VerifyAttest.csv", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+		if err != nil {
+			log.WithError(err).Error("Failed to create file for VerifyAttest.csv")
+		} else {
+			write := bufio.NewWriter(file)
+			write.WriteString(fmt.Sprintf("%d,%d\n", int64(a.Data.Slot), t2.Sub(t1).Milliseconds()))
+			write.Flush()
+			file.Close()
+		}
+	}()
 
 	if err := helpers.ValidateNilAttestation(a); err != nil {
 		return err

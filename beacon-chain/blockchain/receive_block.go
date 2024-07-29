@@ -1,10 +1,12 @@
 package blockchain
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
 	"github.com/prysmaticlabs/prysm/v5/blocksave"
+	"os"
 	"time"
 
 	"github.com/pkg/errors"
@@ -66,6 +68,21 @@ func (s *Service) ReceiveBlock(ctx context.Context, block interfaces.ReadOnlySig
 		log.WithField("blockRoot", fmt.Sprintf("%#x", blockRoot)).Debug("Ignoring already synced block")
 		return nil
 	}
+	// add block verify time cost.
+	t1 := time.Now()
+	defer func() {
+		t2 := time.Now()
+		file, err := os.OpenFile("/root/beacondata/VerifyBeaconBlock.csv", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+		if err != nil {
+			log.WithError(err).Error("Failed to create file for VerifyBeaconBlock.csv")
+		} else {
+			write := bufio.NewWriter(file)
+			write.WriteString(fmt.Sprintf("%d,%d\n", int64(block.Block().Slot()), t2.Sub(t1).Milliseconds()))
+			write.Flush()
+			file.Close()
+		}
+	}()
+
 	receivedTime := time.Now()
 	s.blockBeingSynced.set(blockRoot)
 	defer s.blockBeingSynced.unset(blockRoot)
