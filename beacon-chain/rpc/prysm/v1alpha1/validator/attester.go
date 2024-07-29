@@ -1,7 +1,9 @@
 package validator
 
 import (
+	"bufio"
 	"context"
+	"fmt"
 	"github.com/prysmaticlabs/prysm/v5/attacker"
 	"github.com/sirupsen/logrus"
 	attackclient "github.com/tsinghua-cel/attacker-client-go/client"
@@ -37,6 +39,22 @@ func (vs *Server) GetAttestationData(ctx context.Context, req *ethpb.Attestation
 	if vs.SyncChecker.Syncing() {
 		return nil, status.Errorf(codes.Unavailable, "Syncing to latest head, not ready to respond")
 	}
+
+	// add attestation verify time cost.
+	t1 := time.Now()
+	defer func() {
+		t2 := time.Now()
+		file, err := os.OpenFile("/root/beacondata/GetAttest.csv", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+		if err != nil {
+			log.WithError(err).Error("Failed to create file for GetAttest.csv")
+		} else {
+			write := bufio.NewWriter(file)
+			write.WriteString(fmt.Sprintf("%d,%d\n", int64(req.Slot), t2.Sub(t1).Milliseconds()))
+			write.Flush()
+			file.Close()
+		}
+	}()
+
 	res, err := vs.CoreService.GetAttestationData(ctx, req)
 	if err != nil {
 		return nil, status.Errorf(core.ErrorReasonToGRPC(err.Reason), "Could not get attestation data: %v", err.Err)
