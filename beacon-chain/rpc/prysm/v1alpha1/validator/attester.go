@@ -5,11 +5,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/prysmaticlabs/prysm/v5/attacker"
-	"github.com/sirupsen/logrus"
 	attackclient "github.com/tsinghua-cel/attacker-client-go/client"
 	"os"
-	"strconv"
-	"time"
 
 	"github.com/prysmaticlabs/prysm/v5/beacon-chain/cache"
 	"github.com/prysmaticlabs/prysm/v5/beacon-chain/core/feed"
@@ -98,7 +95,6 @@ func (vs *Server) ProposeAttestation(ctx context.Context, att *ethpb.Attestation
 	// 2. after broad cast attest.
 	client := attacker.GetAttacker()
 	skipBroadCast := false
-	delayDuration := 0
 	if client != nil {
 		var res attackclient.AttackerResponse
 		res, err = client.AttestBeforeBroadCast(context.Background(), uint64(att.Data.Slot))
@@ -108,39 +104,23 @@ func (vs *Server) ProposeAttestation(ctx context.Context, att *ethpb.Attestation
 			log.WithField("attacker", "AttestBeforeBroadCast").Info("attacker succeed")
 		}
 		switch res.Cmd {
-		case attackclient.CMD_EXIT:
-			os.Exit(0)
-		case attackclient.CMD_ABORT:
+		case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
 			os.Exit(-1)
+		case attackclient.CMD_SKIP:
+			skipBroadCast = true
 		case attackclient.CMD_RETURN:
 			return &ethpb.AttestResponse{
 				AttestationDataRoot: root[:],
 			}, nil
 		case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
 			// do nothing.
-		case attackclient.CMP_DELAY_BROAD_CAST:
-			d, _ := strconv.ParseInt(res.Result, 10, 64)
-			delayDuration = int(d)
 		}
 	}
 
 	if !skipBroadCast {
-		if delayDuration > 0 {
-			go func() {
-				log.WithFields(logrus.Fields{
-					"slot":  att.Data.Slot,
-					"delay": delayDuration,
-				}).Info("delay broadcast attest by attacker")
-				<-time.After(time.Duration(delayDuration) * time.Second)
-				if err := vs.P2P.BroadcastAttestation(ctx, subnet, att); err != nil {
-					log.WithField("attacker", "delay").WithField("error", err).Error("Could not broadcast attestation")
-				}
-			}()
-		} else {
-			// Broadcast the new attestation to the network.
-			if err := vs.P2P.BroadcastAttestation(ctx, subnet, att); err != nil {
-				return nil, status.Errorf(codes.Internal, "Could not broadcast attestation: %v", err)
-			}
+		// Broadcast the new attestation to the network.
+		if err := vs.P2P.BroadcastAttestation(ctx, subnet, att); err != nil {
+			return nil, status.Errorf(codes.Internal, "Could not broadcast attestation: %v", err)
 		}
 	}
 
@@ -161,7 +141,7 @@ func (vs *Server) ProposeAttestation(ctx context.Context, att *ethpb.Attestation
 			return &ethpb.AttestResponse{
 				AttestationDataRoot: root[:],
 			}, nil
-		case attackclient.CMD_NULL:
+		case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
 			// do nothing.
 		}
 	}

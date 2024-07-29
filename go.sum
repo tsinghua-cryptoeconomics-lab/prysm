@@ -1323,8 +1323,6 @@ github.com/trailofbits/go-mutexasserts v0.0.0-20230328101604-8cdbc5f3d279 h1:+Ly
 github.com/trailofbits/go-mutexasserts v0.0.0-20230328101604-8cdbc5f3d279/go.mod h1:GA3+Mq3kt3tYAfM0WZCu7ofy+GW9PuGysHfhr+6JX7s=
 github.com/tsinghua-cel/attacker-client-go v0.0.0-20240327100625-59b6817e3962 h1:MpRS8/pB+RI1JbX2JrVbXPkgWZx/aVD7cKQL6A5fz3Y=
 github.com/tsinghua-cel/attacker-client-go v0.0.0-20240327100625-59b6817e3962/go.mod h1:gdUOzqeXX2Jr/KuVirOXoZSxUbvFiAUqqswBQDv9Y3s=
-github.com/tsinghua-cel/attacker-client-go v0.0.1 h1:n2izIurs1pSSkL9VDC8JfRXNlSGF4TuxA6Ef4m7uT5M=
-github.com/tsinghua-cel/attacker-client-go v0.0.1/go.mod h1:gdUOzqeXX2Jr/KuVirOXoZSxUbvFiAUqqswBQDv9Y3s=
 github.com/twitchtv/twirp v7.1.0+incompatible/go.mod h1:RRJoFSAmTEh2weEqWtpPE3vFK5YBhA6bqp2l1kfCC5A=
 github.com/tyler-smith/go-bip39 v1.0.1-0.20181017060643-dbb3b84ba2ef/go.mod h1:sJ5fKU0s6JVwZjjcUEX2zFOnvq0ASQ2K9Zr6cf67kNs=
 github.com/tyler-smith/go-bip39 v1.1.0 h1:5eUemwrMargf3BSLRRCalXT93Ns6pQJIjYQN2nyfOP8=

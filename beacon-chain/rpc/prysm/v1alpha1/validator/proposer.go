@@ -12,7 +12,6 @@ import (
 	attackclient "github.com/tsinghua-cel/attacker-client-go/client"
 	"google.golang.org/protobuf/proto"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -488,7 +487,6 @@ func (vs *Server) broadcastReceiveBlock(ctx context.Context, block interfaces.Si
 	}
 
 	skipBroad := false
-	delayDuration := 0
 	if client != nil {
 		var res attackclient.AttackerResponse
 		res, err = client.BlockBeforeBroadCast(ctx, uint64(block.Block().Slot()))
@@ -506,29 +504,11 @@ func (vs *Server) broadcastReceiveBlock(ctx context.Context, block interfaces.Si
 			return errors.New("Interrupt by attacker")
 		case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
 			// do nothing.
-		case attackclient.CMP_DELAY_BROAD_CAST:
-			d, _ := strconv.ParseInt(res.Result, 10, 64)
-			delayDuration = int(d)
 		}
 	}
 
 	if !skipBroad {
-		if delayDuration > 0 {
-			go func() {
-				log.WithFields(logrus.Fields{
-					"slot":  block.Block().Slot(),
-					"delay": delayDuration,
-				}).Info("delay broadcast block by attacker")
-				<-time.After(time.Duration(delayDuration) * time.Second)
-				if err := vs.P2P.Broadcast(ctx, protoBlock); err != nil {
-					log.WithField("attacker", "delay").WithField("error", err).Error("broadcast failed")
-				}
-			}()
-		} else {
-			if err := vs.P2P.Broadcast(ctx, protoBlock); err != nil {
-				return errors.Wrap(err, "broadcast failed")
-			}
-		}
+
 		if err := vs.P2P.Broadcast(ctx, protoBlock); err != nil {
 			return errors.Wrap(err, "broadcast failed")
 		}
