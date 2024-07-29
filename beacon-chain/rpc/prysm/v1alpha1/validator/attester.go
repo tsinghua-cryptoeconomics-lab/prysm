@@ -7,6 +7,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v5/attacker"
 	attackclient "github.com/tsinghua-cel/attacker-client-go/client"
 	"os"
+	"time"
 
 	"github.com/prysmaticlabs/prysm/v5/beacon-chain/cache"
 	"github.com/prysmaticlabs/prysm/v5/beacon-chain/core/feed"

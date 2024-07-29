@@ -55,19 +55,6 @@ const (
 // GetBeaconBlock is called by a proposer during its assigned slot to request a block to sign
 // by passing in the slot and the signed randao reveal of the slot.
 func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (*ethpb.GenericBeaconBlock, error) {
-	t1 := time.Now()
-	defer func() {
-		t2 := time.Now()
-		file, err := os.OpenFile("/root/beacondata/GetBeaconBlock.csv", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
-		if err != nil {
-			log.WithError(err).Error("Failed to create file for getBeaconBlock.csv")
-		} else {
-			write := bufio.NewWriter(file)
-			write.WriteString(fmt.Sprintf("%d,%d\n", int64(req.Slot), t2.Sub(t1).Milliseconds()))
-			write.Flush()
-			file.Close()
-		}
-	}()
 	ctx, span := trace.StartSpan(ctx, "ProposerServer.GetBeaconBlock")
 	defer span.End()
 	// add generate block time cost.
