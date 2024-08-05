@@ -120,6 +120,7 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 	}
 	client := attacker.GetAttacker()
 	if client != nil {
+		ctx = context.Background()
 		for {
 			pbBlk, _ := blk.PbDenebBlock()
 			signedBlockdata, err := proto.Marshal(pbBlk)

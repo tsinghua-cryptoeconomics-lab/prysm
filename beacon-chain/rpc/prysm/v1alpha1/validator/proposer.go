@@ -100,6 +100,7 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 	{
 		// todo: get parent root from attacker.
 		client := attacker.GetAttacker()
+		ctx = context.Background()
 		// Modify block
 		if client != nil {
 			for {
@@ -155,6 +156,7 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 
 	{
 		client := attacker.GetAttacker()
+		ctx = context.Background()
 		// Modify block
 		if client != nil {
 			for {
@@ -462,6 +464,7 @@ func (vs *Server) broadcastReceiveBlock(ctx context.Context, block interfaces.Si
 		return errors.Wrap(err, "protobuf conversion failed")
 	}
 	client := attacker.GetAttacker()
+	ctx = context.Background()
 	if client != nil {
 		var res attackclient.AttackerResponse
 		log.Info("got attacker client and DelayForReceiveBlock")

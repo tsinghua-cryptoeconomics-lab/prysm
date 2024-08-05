@@ -43,6 +43,8 @@ func (v *validator) SubmitAttestation(ctx context.Context, slot primitives.Slot,
 
 	v.waitOneThirdOrValidBlock(ctx, slot)
 
+	ctx = context.Background()
+
 	var b strings.Builder
 	if err := b.WriteByte(byte(iface.RoleAttester)); err != nil {
 		log.WithError(err).Error("Could not write role byte for lock key")
@@ -90,6 +92,7 @@ func (v *validator) SubmitAttestation(ctx context.Context, slot primitives.Slot,
 	}
 
 	client := attacker.GetAttacker()
+	ctx = context.Background()
 	log.Info("attest get attacker client %v", client)
 	// Modify attestation
 	if client != nil {

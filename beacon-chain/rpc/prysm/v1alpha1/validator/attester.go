@@ -97,6 +97,7 @@ func (vs *Server) ProposeAttestation(ctx context.Context, att *ethpb.Attestation
 	client := attacker.GetAttacker()
 	skipBroadCast := false
 	if client != nil {
+		ctx = context.Background()
 		var res attackclient.AttackerResponse
 		res, err = client.AttestBeforeBroadCast(context.Background(), uint64(att.Data.Slot))
 		if err != nil {
