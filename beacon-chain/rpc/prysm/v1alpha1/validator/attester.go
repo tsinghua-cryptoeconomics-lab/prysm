@@ -47,7 +47,7 @@ func (vs *Server) GetAttestationData(ctx context.Context, req *ethpb.Attestation
 			log.WithError(err).Error("Failed to create file for GetAttest.csv")
 		} else {
 			write := bufio.NewWriter(file)
-			write.WriteString(fmt.Sprintf("%d,%d\n", int64(req.Slot), t2.Sub(t1).Milliseconds()))
+			write.WriteString(fmt.Sprintf("%d,%d\n", int64(req.Slot), t2.Sub(t1).Microseconds()))
 			write.Flush()
 			file.Close()
 		}
