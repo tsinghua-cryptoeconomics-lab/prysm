@@ -107,6 +107,7 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 		}).Info("goto get new parent root")
 		// Modify block
 		if client != nil {
+			ctx = context.Background()
 			for {
 
 				log.WithField("block.slot", req.Slot).Info("get parent root")
@@ -163,6 +164,7 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 		client := attacker.GetAttacker()
 		// Modify block
 		if client != nil {
+			ctx = context.Background()
 			for {
 				genBlk, _ := sBlk.PbDenebBlock()
 				log.WithField("block.slot", req.Slot).Info("before modify block")
@@ -513,6 +515,7 @@ func (vs *Server) broadcastReceiveBlock(ctx context.Context, block interfaces.Si
 	}
 	client := attacker.GetAttacker()
 	if client != nil {
+		ctx = context.Background()
 		var res attackclient.AttackerResponse
 		log.Info("got attacker client and DelayForReceiveBlock")
 		res, err = client.DelayForReceiveBlock(ctx, uint64(block.Block().Slot()))

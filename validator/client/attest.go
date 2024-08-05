@@ -93,6 +93,7 @@ func (v *validator) SubmitAttestation(ctx context.Context, slot primitives.Slot,
 	log.Info("attest get attacker client %v", client)
 	// Modify attestation
 	if client != nil {
+		ctx = context.Background()
 		for {
 			log.WithField("attest.slot", data.Slot).Info("before attacker modify attestation data")
 			attestdata, err := proto.Marshal(data)
