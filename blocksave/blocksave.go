@@ -46,15 +46,7 @@ func QueryBlockStatus(slot int64) bool {
 }
 
 func GetLatestHead(slot int64, checkpoint *ethpb.Checkpoint) *ChainNode {
-	for i := slot; i > 0; i-- {
-		parent := chainTree.FilterLatestBlock(i, checkpoint)
-		if parent == nil {
-			continue
-		} else {
-			return parent
-		}
-	}
-	return nil
+	return chainTree.FilterLatestBlock(slot, checkpoint)
 }
 
 func GetLongestChainWithStableTransport(checkpoint *ethpb.Checkpoint) *ChainNode {

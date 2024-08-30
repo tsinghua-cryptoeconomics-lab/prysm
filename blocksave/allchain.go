@@ -32,11 +32,16 @@ func (n *ChainNode) Stabled() bool {
 	return n.stabled
 }
 
-func (n *ChainNode) UpdateStable() {
+func (n *ChainNode) UpdateStable(slot uint64) {
 	n.mux.Lock()
 	defer n.mux.Unlock()
 	if len(n.attest) >= ValidatorPerSlot/3 {
 		n.stabled = true
+		// store block status to stableSlotBlock
+		if _, ok := chainTree.stableSlotBlock[slot]; !ok {
+			chainTree.stableSlotBlock[slot] = make(map[string]*ChainNode)
+		}
+		chainTree.stableSlotBlock[slot][hex.EncodeToString(n.root)] = n
 	}
 }
 
@@ -193,17 +198,19 @@ func (n *ChainNode) CalcLengthWithoutStableTransport(finalized int64) int64 {
 }
 
 type ChainTree struct {
-	rootNode       *ChainNode
-	blockCache     map[string]*ChainNode // key is block root, and value is ChainNode
-	blockSlotCache map[int64]*ChainNode  // key is slot, and value ChainNode
-	mux            sync.Mutex
+	rootNode        *ChainNode
+	stableSlotBlock map[uint64]map[string]*ChainNode // attest slot => (block root => ChainNode)
+	blockCache      map[string]*ChainNode            // key is block root, and value is ChainNode
+	blockSlotCache  map[int64]*ChainNode             // key is slot, and value ChainNode
+	mux             sync.Mutex
 }
 
 func NewChainTree() *ChainTree {
 	return &ChainTree{
-		rootNode:       nil,
-		blockCache:     make(map[string]*ChainNode),
-		blockSlotCache: make(map[int64]*ChainNode),
+		rootNode:        nil,
+		blockCache:      make(map[string]*ChainNode),
+		blockSlotCache:  make(map[int64]*ChainNode),
+		stableSlotBlock: make(map[uint64]map[string]*ChainNode),
 	}
 }
 
@@ -272,7 +279,7 @@ func (a *ChainTree) UpdateBlockStatus(attest *ethpb.Attestation) {
 	root := attest.Data.BeaconBlockRoot
 	rootStr := hex.EncodeToString(root)
 	if _, ok := a.blockCache[rootStr]; ok {
-		a.blockCache[rootStr].UpdateStable()
+		a.blockCache[rootStr].UpdateStable(uint64(attest.GetData().Slot))
 	} else {
 		logrus.WithFields(logrus.Fields{
 			"root": hex.EncodeToString(root),
@@ -325,11 +332,12 @@ func (a *ChainTree) GetAllLatestBlock() []*ChainNode {
 
 func (a *ChainTree) GetAllBlockOnSlot(slot int64) []*ChainNode {
 	var res []*ChainNode
-	a.IteratorAllNode(func(node *ChainNode) {
-		if int64(node.block.Block().Slot()) == slot {
+	stabled, ok := a.stableSlotBlock[uint64(slot)]
+	if ok {
+		for _, node := range stabled {
 			res = append(res, node)
 		}
-	})
+	}
 	return res
 }
 
@@ -373,36 +381,26 @@ func (a *ChainTree) GetLongestChainWithoutStableTransport(checkpoint *ethpb.Chec
 func (a *ChainTree) FilterLatestBlock(slot int64, checkpoint *ethpb.Checkpoint) *ChainNode {
 	// 查找 slot 内的所有投票，达到stable的block，
 	allBlock := a.GetAllBlockOnSlot(slot)
-	stabled := make([]*ChainNode, 0)
-	unstabled := make([]*ChainNode, 0)
-	for _, node := range allBlock {
-		if node.Stabled() {
-			stabled = append(stabled, node)
-		} else {
-			unstabled = append(unstabled, node)
-		}
-	}
+	stabled := allBlock
 
 	// exist stabled block
 	if len(stabled) > 0 {
 		if len(stabled) == 1 {
 			return stabled[0]
 		} else {
-			// choose the longest chain.
-			return a.getLongestChainWithStableTransport(stabled, checkpoint)
+			// choose max slot block.
+			maxSlot := stabled[0]
+			for _, node := range stabled {
+				if node.block.Block().Slot() > maxSlot.block.Block().Slot() {
+					maxSlot = node
+				}
+			}
+			return maxSlot
 		}
+	} else {
+		// return longest chain.
+		return a.GetLongestChainWithoutStableTransport(checkpoint)
 	}
-	// 如果，没有，则选择一个最长链的block.
-	// otherwise, choose longest chain head.
-	if len(unstabled) > 0 {
-		if len(unstabled) == 1 {
-			return unstabled[0]
-		} else {
-			// choose the longest chain.
-			return a.getLongestChainWithoutStableTransport(unstabled, checkpoint)
-		}
-	}
-	return nil
 }
 
 func (a *ChainTree) getLongestChainWithStableTransport(nodes []*ChainNode, checkpoint *ethpb.Checkpoint) *ChainNode {
