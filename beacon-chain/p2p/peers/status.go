@@ -188,6 +188,7 @@ func (p *Status) ENR(pid peer.ID) (*enr.Record, error) {
 
 // SetChainState sets the chain state of the given remote peer.
 func (p *Status) SetChainState(pid peer.ID, chainState *pb.Status) {
+	log.WithField("peer", pid).WithField("chainState", chainState).Trace("SetChainState for peer")
 	p.scorers.PeerStatusScorer().SetPeerStatus(pid, chainState, nil)
 }
 
