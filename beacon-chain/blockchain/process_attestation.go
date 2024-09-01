@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"github.com/prysmaticlabs/prysm/v5/consensus-types/primitives"
 	"os"
 	"time"
 
@@ -115,7 +116,7 @@ func (s *Service) OnAttestation(ctx context.Context, a *ethpb.Attestation, dispa
 	// We assume trusted attestation in this function has verified signature.
 
 	// Update forkchoice store with the new attestation for updating weight.
-	s.cfg.ForkChoiceStore.ProcessAttestation(ctx, indexedAtt.AttestingIndices, bytesutil.ToBytes32(a.Data.BeaconBlockRoot), a.Data.Target.Epoch)
+	s.cfg.ForkChoiceStore.ProcessAttestation(ctx, indexedAtt.AttestingIndices, bytesutil.ToBytes32(a.Data.BeaconBlockRoot), primitives.Epoch(a.Data.Slot))
 
 	return nil
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v5/config/params"
 )
 
 func (s *Store) setOptimisticToInvalid(ctx context.Context, root, parentRoot, lastValidHash [32]byte) ([][32]byte, error) {
@@ -86,13 +85,13 @@ func (s *Store) removeNodeAndChildren(ctx context.Context, node *Node, invalidRo
 		}
 	}
 	invalidRoots = append(invalidRoots, node.root)
-	if node.root == s.proposerBoostRoot {
-		s.proposerBoostRoot = [32]byte{}
-	}
-	if node.root == s.previousProposerBoostRoot {
-		s.previousProposerBoostRoot = params.BeaconConfig().ZeroHash
-		s.previousProposerBoostScore = 0
-	}
+	//if node.root == s.proposerBoostRoot {
+	//	s.proposerBoostRoot = [32]byte{}
+	//}
+	//if node.root == s.previousProposerBoostRoot {
+	//	s.previousProposerBoostRoot = params.BeaconConfig().ZeroHash
+	//	s.previousProposerBoostScore = 0
+	//}
 	delete(s.nodeByRoot, node.root)
 	delete(s.nodeByPayload, node.payloadHash)
 	return invalidRoots, nil

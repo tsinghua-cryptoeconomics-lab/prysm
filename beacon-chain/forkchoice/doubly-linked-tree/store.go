@@ -22,42 +22,43 @@ func (s *Store) head(ctx context.Context) ([32]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return [32]byte{}, err
 	}
+	return s.headNode.root, nil
 
 	// JustifiedRoot has to be known
-	justifiedNode, ok := s.nodeByRoot[s.justifiedCheckpoint.Root]
-	if !ok || justifiedNode == nil {
-		// If the justifiedCheckpoint is from genesis, then the root is
-		// zeroHash. In this case it should be the root of forkchoice
-		// tree.
-		if s.justifiedCheckpoint.Epoch == params.BeaconConfig().GenesisEpoch {
-			justifiedNode = s.treeRootNode
-		} else {
-			return [32]byte{}, errors.WithMessage(errUnknownJustifiedRoot, fmt.Sprintf("%#x", s.justifiedCheckpoint.Root))
-		}
-	}
-
-	// If the justified node doesn't have a best descendant,
-	// the best node is itself.
-	bestDescendant := justifiedNode.bestDescendant
-	if bestDescendant == nil {
-		bestDescendant = justifiedNode
-	}
-	currentEpoch := slots.EpochsSinceGenesis(time.Unix(int64(s.genesisTime), 0))
-	if !bestDescendant.viableForHead(s.justifiedCheckpoint.Epoch, currentEpoch) {
-		s.allTipsAreInvalid = true
-		return [32]byte{}, fmt.Errorf("head at slot %d with weight %d is not eligible, finalizedEpoch, justified Epoch %d, %d != %d, %d",
-			bestDescendant.slot, bestDescendant.weight/10e9, bestDescendant.finalizedEpoch, bestDescendant.justifiedEpoch, s.finalizedCheckpoint.Epoch, s.justifiedCheckpoint.Epoch)
-	}
-	s.allTipsAreInvalid = false
-
-	// Update metrics.
-	if bestDescendant != s.headNode {
-		headChangesCount.Inc()
-		headSlotNumber.Set(float64(bestDescendant.slot))
-		s.headNode = bestDescendant
-	}
-
-	return bestDescendant.root, nil
+	//justifiedNode, ok := s.nodeByRoot[s.justifiedCheckpoint.Root]
+	//if !ok || justifiedNode == nil {
+	//	// If the justifiedCheckpoint is from genesis, then the root is
+	//	// zeroHash. In this case it should be the root of forkchoice
+	//	// tree.
+	//	if s.justifiedCheckpoint.Epoch == params.BeaconConfig().GenesisEpoch {
+	//		justifiedNode = s.treeRootNode
+	//	} else {
+	//		return [32]byte{}, errors.WithMessage(errUnknownJustifiedRoot, fmt.Sprintf("%#x", s.justifiedCheckpoint.Root))
+	//	}
+	//}
+	//
+	//// If the justified node doesn't have a best descendant,
+	//// the best node is itself.
+	//bestDescendant := justifiedNode.bestDescendant
+	//if bestDescendant == nil {
+	//	bestDescendant = justifiedNode
+	//}
+	//currentEpoch := slots.EpochsSinceGenesis(time.Unix(int64(s.genesisTime), 0))
+	//if !bestDescendant.viableForHead(s.justifiedCheckpoint.Epoch, currentEpoch) {
+	//	s.allTipsAreInvalid = true
+	//	return [32]byte{}, fmt.Errorf("head at slot %d with weight %d is not eligible, finalizedEpoch, justified Epoch %d, %d != %d, %d",
+	//		bestDescendant.slot, bestDescendant.weight/10e9, bestDescendant.finalizedEpoch, bestDescendant.justifiedEpoch, s.finalizedCheckpoint.Epoch, s.justifiedCheckpoint.Epoch)
+	//}
+	//s.allTipsAreInvalid = false
+	//
+	//// Update metrics.
+	//if bestDescendant != s.headNode {
+	//	headChangesCount.Inc()
+	//	headSlotNumber.Set(float64(bestDescendant.slot))
+	//	s.headNode = bestDescendant
+	//}
+	//
+	//return bestDescendant.root, nil
 }
 
 // insert registers a new block node to the fork choice store's node list.
@@ -76,16 +77,14 @@ func (s *Store) insert(ctx context.Context,
 
 	parent := s.nodeByRoot[parentRoot]
 	n := &Node{
-		slot:                     slot,
-		root:                     root,
-		parent:                   parent,
-		justifiedEpoch:           justifiedEpoch,
-		unrealizedJustifiedEpoch: justifiedEpoch,
-		finalizedEpoch:           finalizedEpoch,
-		unrealizedFinalizedEpoch: finalizedEpoch,
-		optimistic:               true,
-		payloadHash:              payloadHash,
-		timestamp:                uint64(time.Now().Unix()),
+		slot:           slot,
+		root:           root,
+		parent:         parent,
+		justifiedEpoch: justifiedEpoch,
+		finalizedEpoch: finalizedEpoch,
+		optimistic:     true,
+		payloadHash:    payloadHash,
+		timestamp:      uint64(time.Now().Unix()),
 	}
 
 	// Set the node's target checkpoint
@@ -105,7 +104,6 @@ func (s *Store) insert(ctx context.Context,
 		if s.treeRootNode == nil {
 			s.treeRootNode = n
 			s.headNode = n
-			s.highestReceivedNode = n
 		} else {
 			return n, errInvalidParentRoot
 		}
@@ -116,18 +114,13 @@ func (s *Store) insert(ctx context.Context,
 		if timeNow < s.genesisTime {
 			return n, nil
 		}
-		secondsIntoSlot := (timeNow - s.genesisTime) % params.BeaconConfig().SecondsPerSlot
+
 		currentSlot := slots.CurrentSlot(s.genesisTime)
-		boostThreshold := params.BeaconConfig().SecondsPerSlot / params.BeaconConfig().IntervalsPerSlot
-		isFirstBlock := s.proposerBoostRoot == [32]byte{}
-		if currentSlot == slot && secondsIntoSlot < boostThreshold && isFirstBlock {
-			s.proposerBoostRoot = root
-		}
 
 		// Update best descendants
 		jEpoch := s.justifiedCheckpoint.Epoch
 		fEpoch := s.finalizedCheckpoint.Epoch
-		if err := s.treeRootNode.updateBestDescendant(ctx, jEpoch, fEpoch, slots.ToEpoch(currentSlot)); err != nil {
+		if err := s.updateBestDescendant(ctx, jEpoch, fEpoch, slots.ToEpoch(currentSlot)); err != nil {
 			return n, err
 		}
 	}
@@ -138,10 +131,6 @@ func (s *Store) insert(ctx context.Context,
 	// Only update received block slot if it's within epoch from current time.
 	if slot+params.BeaconConfig().SlotsPerEpoch > slots.CurrentSlot(s.genesisTime) {
 		s.receivedBlocksLastEpoch[slot%params.BeaconConfig().SlotsPerEpoch] = slot
-	}
-	// Update highest slot tracking.
-	if slot > s.highestReceivedNode.slot {
-		s.highestReceivedNode = n
 	}
 
 	return n, nil
@@ -232,26 +221,51 @@ func (s *Store) tips() ([][32]byte, []primitives.Slot) {
 	return roots, slots
 }
 
+// updateBestDescendant updates the best descendant of this node and its
+// children.
+func (s *Store) updateBestDescendant(ctx context.Context, justifiedEpoch, finalizedEpoch, currentEpoch primitives.Epoch) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if len(s.treeRootNode.children) == 0 || s.treeRootNode == nil {
+		s.headNode = nil
+		return nil
+	}
+	// 1. get all leaf nodes. tips
+	// 2. filter by viableForHead on tips
+	// 3. get max depth by depth.
+	leaves, _ := s.tips()
+	filters := make([]*Node, 0)
+	for _, root := range leaves {
+		node := s.nodeByRoot[root]
+		if node != nil && node.viableForHead(justifiedEpoch, currentEpoch) && node.stabled {
+			filters = append(filters, node)
+		}
+	}
+	if len(filters) == 0 {
+		s.headNode = nil
+		return nil
+	}
+	maxNode := filters[0]
+	for _, node := range filters {
+		if node.depth() > maxNode.depth() {
+			maxNode = node
+		}
+	}
+	s.headNode = maxNode
+
+	return nil
+}
+
 // HighestReceivedBlockSlot returns the highest slot received by the forkchoice
 func (f *ForkChoice) HighestReceivedBlockSlot() primitives.Slot {
-	if f.store.highestReceivedNode == nil {
-		return 0
-	}
-	return f.store.highestReceivedNode.slot
+	return primitives.Slot(0)
 }
 
 // HighestReceivedBlockSlotDelay returns the number of slots that the highest
 // received block was late when receiving it
 func (f *ForkChoice) HighestReceivedBlockDelay() primitives.Slot {
-	n := f.store.highestReceivedNode
-	if n == nil {
-		return 0
-	}
-	secs, err := slots.SecondsSinceSlotStart(n.slot, f.store.genesisTime, n.timestamp)
-	if err != nil {
-		return 0
-	}
-	return primitives.Slot(secs / params.BeaconConfig().SecondsPerSlot)
+	return primitives.Slot(0)
 }
 
 // ReceivedBlocksLastEpoch returns the number of blocks received in the last epoch

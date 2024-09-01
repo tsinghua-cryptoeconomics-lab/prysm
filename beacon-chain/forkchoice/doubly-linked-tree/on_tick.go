@@ -3,7 +3,6 @@ package doublylinkedtree
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/v5/consensus-types/primitives"
 	"github.com/prysmaticlabs/prysm/v5/time/slots"
 )
@@ -31,7 +30,7 @@ import (
 //	        store.justified_checkpoint = store.best_justified_checkpoint
 func (f *ForkChoice) NewSlot(ctx context.Context, slot primitives.Slot) error {
 	// Reset proposer boost root
-	f.store.proposerBoostRoot = [32]byte{}
+	//f.store.proposerBoostRoot = [32]byte{}
 
 	// Return if it's not a new epoch.
 	if !slots.IsEpochStart(slot) {
@@ -39,8 +38,8 @@ func (f *ForkChoice) NewSlot(ctx context.Context, slot primitives.Slot) error {
 	}
 
 	// Update store.justified_checkpoint if a better checkpoint on the store.finalized_checkpoint chain
-	if err := f.updateUnrealizedCheckpoints(ctx); err != nil {
-		return errors.Wrap(err, "could not update unrealized checkpoints")
-	}
+	//if err := f.updateUnrealizedCheckpoints(ctx); err != nil {
+	//	return errors.Wrap(err, "could not update unrealized checkpoints")
+	//}
 	return f.store.prune(ctx)
 }
