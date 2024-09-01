@@ -124,6 +124,15 @@ func (s *Store) insert(ctx context.Context,
 			return n, err
 		}
 	}
+	lastSlot := slot - 1
+	if stabledBlks, ok := s.votedSlotBlock[uint64(lastSlot)]; ok {
+		for _, blk := range stabledBlks {
+			if blk.root == parentRoot {
+				blk.stabled = true
+			}
+		}
+	}
+
 	// Update metrics.
 	processedBlockCount.Inc()
 	nodeCount.Set(float64(len(s.nodeByRoot)))

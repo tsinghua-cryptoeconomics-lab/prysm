@@ -33,7 +33,7 @@ type Store struct {
 	genesisTime             uint64
 	receivedBlocksLastEpoch [fieldparams.SlotsPerEpoch]primitives.Slot        // Using `highestReceivedSlot`. The slot of blocks received in the last epoch.
 	allTipsAreInvalid       bool                                              // tracks if all tips are not viable for head
-	stableSlotBlock         map[uint64]map[[fieldparams.RootLength]byte]*Node // attest slot => (block root => ChainNode)
+	votedSlotBlock          map[uint64]map[[fieldparams.RootLength]byte]*Node // attest slot => (block root => ChainNode)
 }
 
 // Node defines the individual block which includes its block parent, ancestor and how much weight accounted for it.

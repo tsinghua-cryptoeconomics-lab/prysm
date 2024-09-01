@@ -73,7 +73,7 @@ func (f *ForkChoice) ProcessAttestation(ctx context.Context, validatorIndices []
 		node.validatorIndices = make([]uint64, 0)
 	}
 	node.validatorIndices = append(node.validatorIndices, validatorIndices...)
-	node.UpdateStable(f.store, uint64(attestSlot))
+	node.UpdateVoted(f.store, uint64(attestSlot))
 
 	processedAttestationCount.Inc()
 }

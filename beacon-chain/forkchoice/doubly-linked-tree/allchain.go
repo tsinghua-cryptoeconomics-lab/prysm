@@ -125,13 +125,13 @@ func changeUnstableToStable(unstable int64) int64 {
 	}
 }
 
-func (n *Node) UpdateStable(store *Store, slot uint64) {
+func (n *Node) UpdateVoted(store *Store, slot uint64) {
 	if len(n.validatorIndices) >= ValidatorPerSlot/3 {
 		n.stabled = true
-		// store block status to stableSlotBlock
-		if _, ok := store.stableSlotBlock[slot]; !ok {
-			store.stableSlotBlock[slot] = make(map[[fieldparams.RootLength]byte]*Node)
+		// store block status to votedSlotBlock
+		if _, ok := store.votedSlotBlock[slot]; !ok {
+			store.votedSlotBlock[slot] = make(map[[fieldparams.RootLength]byte]*Node)
 		}
-		store.stableSlotBlock[slot][n.root] = n
+		store.votedSlotBlock[slot][n.root] = n
 	}
 }
