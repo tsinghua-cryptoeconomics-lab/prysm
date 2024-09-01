@@ -132,6 +132,7 @@ func (s *Store) insert(ctx context.Context,
 		}
 	}
 	lastSlot := slot - 1
+	s.mux.Lock()
 	if stabledBlks, ok := s.votedSlotBlock[uint64(lastSlot)]; ok {
 		for _, blk := range stabledBlks {
 			if blk.root == parentRoot {
@@ -139,6 +140,7 @@ func (s *Store) insert(ctx context.Context,
 			}
 		}
 	}
+	s.mux.Unlock()
 
 	// Update metrics.
 	processedBlockCount.Inc()

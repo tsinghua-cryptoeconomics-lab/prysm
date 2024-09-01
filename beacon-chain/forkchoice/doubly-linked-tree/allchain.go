@@ -128,10 +128,12 @@ func changeUnstableToStable(unstable int64) int64 {
 func (n *Node) UpdateVoted(store *Store, slot uint64) {
 	if len(n.validatorIndices) >= ValidatorPerSlot/3 {
 		n.stabled = true
+		store.mux.Lock()
 		// store block status to votedSlotBlock
 		if _, ok := store.votedSlotBlock[slot]; !ok {
 			store.votedSlotBlock[slot] = make(map[[fieldparams.RootLength]byte]*Node)
 		}
 		store.votedSlotBlock[slot][n.root] = n
+		store.mux.Unlock()
 	}
 }

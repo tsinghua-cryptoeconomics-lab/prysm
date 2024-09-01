@@ -34,6 +34,7 @@ type Store struct {
 	receivedBlocksLastEpoch [fieldparams.SlotsPerEpoch]primitives.Slot        // Using `highestReceivedSlot`. The slot of blocks received in the last epoch.
 	allTipsAreInvalid       bool                                              // tracks if all tips are not viable for head
 	votedSlotBlock          map[uint64]map[[fieldparams.RootLength]byte]*Node // attest slot => (block root => ChainNode)
+	mux                     sync.Mutex
 }
 
 // Node defines the individual block which includes its block parent, ancestor and how much weight accounted for it.

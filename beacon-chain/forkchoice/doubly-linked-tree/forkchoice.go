@@ -28,6 +28,7 @@ func New() *ForkChoice {
 		nodeByRoot:              make(map[[fieldparams.RootLength]byte]*Node),
 		nodeByPayload:           make(map[[fieldparams.RootLength]byte]*Node),
 		receivedBlocksLastEpoch: [fieldparams.SlotsPerEpoch]primitives.Slot{},
+		votedSlotBlock:          make(map[uint64]map[[fieldparams.RootLength]byte]*Node),
 	}
 
 	b := make([]uint64, 0)
