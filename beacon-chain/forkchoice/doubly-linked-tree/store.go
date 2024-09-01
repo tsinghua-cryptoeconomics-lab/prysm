@@ -22,6 +22,13 @@ func (s *Store) head(ctx context.Context) ([32]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return [32]byte{}, err
 	}
+	if s.headNode == nil {
+		if s.justifiedCheckpoint.Epoch == params.BeaconConfig().GenesisEpoch {
+			s.headNode = s.treeRootNode
+		} else {
+			return [32]byte{}, errors.WithMessage(errUnknownJustifiedRoot, fmt.Sprintf("%#x", s.justifiedCheckpoint.Root))
+		}
+	}
 	return s.headNode.root, nil
 
 	// JustifiedRoot has to be known
