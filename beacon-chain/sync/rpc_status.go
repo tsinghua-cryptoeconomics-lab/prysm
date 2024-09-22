@@ -92,16 +92,16 @@ func (s *Service) resyncIfBehind() {
 			highestEpoch, _ := s.cfg.p2p.Peers().BestNonFinalized(flags.Get().MinimumSyncPeers*2, syncedEpoch)
 			// Check if the current node is more than 1 epoch behind.
 			if highestEpoch > (syncedEpoch + 1) {
-				//log.WithFields(logrus.Fields{
-				//	"currentEpoch": slots.ToEpoch(s.cfg.clock.CurrentSlot()),
-				//	"syncedEpoch":  syncedEpoch,
-				//	"peersEpoch":   highestEpoch,
-				//}).Info("Fallen behind peers; reverting to initial sync to catch up")
-				//numberOfTimesResyncedCounter.Inc()
-				//s.clearPendingSlots()
-				//if err := s.cfg.initialSync.Resync(); err != nil {
-				//	log.WithError(err).Errorf("Could not resync chain")
-				//}
+				log.WithFields(logrus.Fields{
+					"currentEpoch": slots.ToEpoch(s.cfg.clock.CurrentSlot()),
+					"syncedEpoch":  syncedEpoch,
+					"peersEpoch":   highestEpoch,
+				}).Info("Fallen behind peers; reverting to initial sync to catch up")
+				numberOfTimesResyncedCounter.Inc()
+				s.clearPendingSlots()
+				if err := s.cfg.initialSync.Resync(); err != nil {
+					log.WithError(err).Errorf("Could not resync chain")
+				}
 			}
 		}
 	})
