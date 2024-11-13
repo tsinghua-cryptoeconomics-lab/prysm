@@ -121,6 +121,12 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 				}
 				newParentRoot, _ := hex.DecodeString(result.Result)
 				if bytes.Compare(newParentRoot, parentRoot[:]) != 0 {
+					log.WithFields(logrus.Fields{
+						"oldParentRoot":     hex.EncodeToString(parentRoot[:]),
+						"baseOldParentRoot": base64.StdEncoding.EncodeToString(parentRoot[:]),
+						"newParentRoot":     hex.EncodeToString(newParentRoot[:]),
+						"baseNewParent":     base64.StdEncoding.EncodeToString(newParentRoot),
+					}).Info("update block new parent root")
 					copy(parentRoot[:], newParentRoot)
 					log.WithField("parentRoot", result.Result).Info("update block new parent root")
 				}
