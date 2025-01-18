@@ -3,6 +3,7 @@ package doublylinkedtree
 import (
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"time"
 
 	"github.com/pkg/errors"
@@ -111,6 +112,7 @@ func (s *Store) insert(ctx context.Context,
 		if s.treeRootNode == nil {
 			s.treeRootNode = n
 			s.headNode = n
+			n.stabled = true
 		} else {
 			return n, errInvalidParentRoot
 		}
@@ -127,20 +129,33 @@ func (s *Store) insert(ctx context.Context,
 		// Update best descendants
 		jEpoch := s.justifiedCheckpoint.Epoch
 		fEpoch := s.finalizedCheckpoint.Epoch
+
+		{
+			if count, exist := s.cacheAttCount[parentRoot]; exist {
+				if count >= ValidatorPerSlot/2 {
+					n.stabled = true
+				}
+			} else {
+				if parent.slot == 0 {
+					n.stabled = true
+				}
+			}
+		}
+
 		if err := s.updateBestDescendant(ctx, jEpoch, fEpoch, slots.ToEpoch(currentSlot)); err != nil {
 			return n, err
 		}
 	}
-	lastSlot := slot - 1
-	s.mux.Lock()
-	if stabledBlks, ok := s.votedSlotBlock[uint64(lastSlot)]; ok {
-		for _, blk := range stabledBlks {
-			if blk.root == parentRoot {
-				blk.stabled = true
-			}
-		}
-	}
-	s.mux.Unlock()
+	//lastSlot := slot - 1
+	//s.mux.Lock()
+	//if stabledBlks, ok := s.votedSlotBlock[uint64(lastSlot)]; ok {
+	//	for _, blk := range stabledBlks {
+	//		if blk.root == parentRoot {
+	//			blk.stabled = true
+	//		}
+	//	}
+	//}
+	//s.mux.Unlock()
 
 	// Update metrics.
 	processedBlockCount.Inc()
@@ -252,14 +267,28 @@ func (s *Store) updateBestDescendant(ctx context.Context, justifiedEpoch, finali
 	// 1. get all leaf nodes. tips
 	// 2. filter by viableForHead on tips
 	// 3. get max depth by depth.
-	leaves, _ := s.tips()
+	leaves, slots := s.tips()
 	filters := make([]*Node, 0)
-	for _, root := range leaves {
+	log.WithFields(logrus.Fields{
+		"leaf count": len(leaves),
+		"slots":      fmt.Sprintf("0x%v", slots),
+	}).Info("Debug ForkChoice tips")
+	for i, root := range leaves {
 		node := s.nodeByRoot[root]
+		log.WithFields(logrus.Fields{
+			"slot":           slots[i],
+			"justifiedEpoch": justifiedEpoch,
+			"currentEpoch":   currentEpoch,
+			"viableForHead":  node.viableForHead(justifiedEpoch, currentEpoch),
+			"stabled":        node.stabled,
+		}).Info("Debug ForkChoice tips")
 		if node != nil && node.viableForHead(justifiedEpoch, currentEpoch) && node.stabled {
 			filters = append(filters, node)
 		}
 	}
+	log.WithFields(logrus.Fields{
+		"filter": len(filters),
+	}).Info("Debug ForkChoice tips after filter")
 	if len(filters) == 0 {
 		s.headNode = nil
 		return nil
@@ -268,11 +297,30 @@ func (s *Store) updateBestDescendant(ctx context.Context, justifiedEpoch, finali
 	for _, node := range filters {
 		if node.depth() > maxNode.depth() {
 			maxNode = node
+			log.WithFields(logrus.Fields{
+				"maxNode": fmt.Sprintf("0x%x-depth:%d", maxNode.root, maxNode.depth()),
+				"node":    fmt.Sprintf("0x%x-depth:%d", node.root, node.depth()),
+			}).Info("Debug ForkChoice tips after filter")
+		} else if node.depth() == maxNode.depth() {
+			if node.slot > maxNode.slot {
+				maxNode = node
+				log.WithFields(logrus.Fields{
+					"maxNode": fmt.Sprintf("0x%x-depth:%d", maxNode.root, maxNode.depth()),
+					"node":    fmt.Sprintf("0x%x-depth:%d", node.root, node.depth()),
+				}).Info("Debug ForkChoice tips after filter when depth equal")
+			}
 		}
 	}
 	s.headNode = maxNode
 
 	return nil
+}
+
+func (s *Store) UpdateVoted(slot uint64, root [fieldparams.RootLength]byte, count int) {
+	if slot != s.cacheSlot || s.cacheAttCount == nil {
+		s.cacheAttCount = make(map[[fieldparams.RootLength]byte]int)
+	}
+	s.cacheAttCount[root] += count
 }
 
 // HighestReceivedBlockSlot returns the highest slot received by the forkchoice

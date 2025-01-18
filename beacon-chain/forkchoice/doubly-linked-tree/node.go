@@ -66,7 +66,7 @@ func (n *Node) depth() uint64 {
 // Any node with different finalized or justified epoch than
 // the ones in fork choice store should not be viable to head.
 func (n *Node) viableForHead(justifiedEpoch, currentEpoch primitives.Epoch) bool {
-	justified := justifiedEpoch == n.justifiedEpoch || justifiedEpoch == 0
+	justified := justifiedEpoch == n.justifiedEpoch || justifiedEpoch == 0 || currentEpoch == 0
 
 	return justified
 }

@@ -2,6 +2,8 @@ package doublylinkedtree
 
 import (
 	"context"
+	"fmt"
+	"github.com/sirupsen/logrus"
 	"time"
 
 	"github.com/pkg/errors"
@@ -74,7 +76,15 @@ func (f *ForkChoice) ProcessAttestation(ctx context.Context, validatorIndices []
 		node.validatorIndices = make([]uint64, 0)
 	}
 	node.validatorIndices = append(node.validatorIndices, validatorIndices...)
-	node.UpdateVoted(f.store, uint64(attestSlot))
+	root := blockRoot
+	count := len(validatorIndices)
+	f.store.UpdateVoted(uint64(attestSlot), root, count)
+	log.WithFields(logrus.Fields{
+		"blockRoot":             fmt.Sprintf("%#x", bytesutil.Trunc(blockRoot[:])),
+		"attestSlot":            attestSlot,
+		"newValidatorIndices":   len(validatorIndices),
+		"totalValidatorIndices": len(node.validatorIndices),
+	}).Info("Debug ForkChoice ProcessAttestation")
 
 	processedAttestationCount.Inc()
 }
@@ -150,8 +160,10 @@ func (f *ForkChoice) IsCanonical(root [32]byte) bool {
 	if !ok || node == nil {
 		return false
 	}
-
 	leaf := f.store.headNode
+	if node == f.store.headNode {
+		return true
+	}
 	for leaf != nil && leaf.slot >= node.slot {
 		if leaf.root == root {
 			return true
